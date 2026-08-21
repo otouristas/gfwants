@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { contribute, createCheckout } from "@/lib/fund-api";
+import { createCheckout } from "@/lib/fund-api";
 import { STRIPE_CHARGE_CENTS } from "@/lib/stripe";
 import {
   TIER_BY_ID,
@@ -81,12 +81,6 @@ export function ContributeDialog({ open, onOpenChange, draft, onDraftChange, onS
     }
     setBusy(true);
     try {
-      const result = await contribute({ data: payload() });
-      setPaid({
-        amount: result.contribution.amountCents,
-        score: approvalScore(result.raisedCents),
-      });
-      onSettled();
       const checkout = await createCheckout({ data: payload() });
       window.location.assign(checkout.url);
     } catch (err) {

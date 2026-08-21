@@ -29,7 +29,7 @@ type Row = {
   created_at: Date | string;
 };
 
-const SEED_VERSION = "paid-three-v1";
+const SEED_VERSION = "paid-three-v2";
 
 const PAID_SEED: Array<{
   amount_cents: number;
@@ -152,6 +152,13 @@ async function ensureSeed() {
     )
   `;
   await sql`alter table contributions add column if not exists stripe_session_id text`;
+  await sql`
+    create table if not exists pending_payments (
+      id text primary key,
+      payload text not null,
+      created_at timestamptz not null default now()
+    )
+  `;
   const rows = await sql<{ v: string }>`select v from fund_meta where k = 'seed'`;
   if (rows[0]?.v === SEED_VERSION) return;
   await sql`delete from contributions`;
@@ -320,10 +327,70 @@ export const contribute = createServerFn({ method: "POST" })
 
 export const createCheckout = createServerFn({ method: "POST" })
   .validator((data: unknown) => contributeSchema.parse(data))
-  .handler(async ({ data }): Promise<{ url: string }> => {
+  .handler(async ({ data }): Promise<{ url: string; pendingId: string }> => {
     listingFromDraft(data);
-    const ref = encodeURIComponent(
-      `${data.tier}:${data.displayName || "anon"}`.slice(0, 80),
-    );
-    return { url: `${STRIPE_PAY_URL}?client_reference_id=${ref}` };
+    await ensureSeed();
+    const pendingId = crypto.randomUUID();
+    const sql = await getSql();
+    await sql`
+      insert into pending_payments (id, payload) values (${pendingId}, ${JSON.stringify(data)})
+    `;
+    return {
+      pendingId,
+      url: `${STRIPE_PAY_URL}?client_reference_id=${encodeURIComponent(pendingId)}`,
+    };
   });
+
+async function listingByStripeSession(sessionId: string): Promise<Contribution | null> {
+  const sql = await getSql();
+  const rows = await sql<Row>`
+    select id, amount_cents, tier, display_name, x_handle, message,
+           product_name, product_url, product_pitch, created_at
+    from contributions
+    where stripe_session_id = ${sessionId}
+    limit 1
+  `;
+  return rows[0] ? mapRow(rows[0]) : null;
+}
+
+export async function fulfillStripeSession(input: {
+  sessionId: string;
+  pendingId: string | null;
+  amountCents: number | null;
+  customerName: string | null;
+}): Promise<{ contribution: Contribution | null; duplicate: boolean }> {
+  await ensureSeed();
+  const existing = await listingByStripeSession(input.sessionId);
+  if (existing) return { contribution: existing, duplicate: true };
+
+  let draft: ContributeInput | null = null;
+  if (input.pendingId) {
+    const sql = await getSql();
+    const rows = await sql<{ payload: string }>`
+      select payload from pending_payments where id = ${input.pendingId} limit 1
+    `;
+    if (rows[0]?.payload) {
+      try {
+        draft = contributeSchema.parse(JSON.parse(rows[0].payload));
+      } catch {
+        draft = null;
+      }
+    }
+  }
+
+  if (!draft) {
+    draft = {
+      tier: "honeymoon",
+      displayName: input.customerName || "Anonymous",
+      xHandle: "",
+      message: "Paid on Stripe.",
+      productName: "",
+      productUrl: "",
+      productPitch: "",
+      anonymous: !input.customerName,
+    };
+  }
+
+  const result = await insertListing(listingFromDraft(draft), input.sessionId);
+  return { contribution: result.contribution, duplicate: false };
+}

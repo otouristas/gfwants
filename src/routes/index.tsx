@@ -40,7 +40,8 @@ function Home() {
     queryKey: ["fund"],
     queryFn: () => getFund(),
     initialData: initial,
-    refetchInterval: 8000,
+    refetchInterval: 2500,
+    refetchOnWindowFocus: true,
   });
   const fund = query.data ?? initial;
   const [open, setOpen] = useState(false);

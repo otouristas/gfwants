@@ -29,7 +29,7 @@ function RulesPage() {
           <li>This is not a charity and not tax-deductible. You are buying a screenshot and a link.</li>
           <li>Amounts are in euros. Impulse is €2, €5, €10, €25, €50, and €100.</li>
           <li>Product slots start at €50. Those put a real website on this homepage with a sponsored link.</li>
-          <li>Card payments go through Stripe. Money lands in Touristas AI. Not a charity.</li>
+          <li>Card payments go through Stripe. When Stripe says paid, you land on the wall. Money goes to Touristas AI. Not a charity.</li>
           <li>Limited slots stay limited. When they are gone, they are gone.</li>
           <li>Equal amounts keep the older listing higher. You cannot steal a rank by matching it.</li>
           <li>The Girlfriend Approval Index is a joke KPI. It goes up when money comes in. That is the entire algorithm.</li>
