@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ContributeDialog, type ContributeDraft } from "@/components/contribute-dialog";
-import { Hero, Leaderboard, MoneyMade, SiteFooter } from "@/components/fund-page";
+import { Hero, HostageWall, Leaderboard, Meters, MoneyMade, SiteFooter, SpendChart } from "@/components/fund-page";
 import { SiteChrome } from "@/components/site-chrome";
 import { claimCents, tierForAmount } from "@/lib/fund";
 import { getFund, pingVisitor } from "@/lib/fund-api";
@@ -67,12 +67,15 @@ function Home() {
   return (
     <div className="flex min-h-dvh flex-col bg-bg text-fg">
       <SiteChrome raisedCents={fund.raisedCents} onContribute={openDefault} />
-      <Hero fund={fund} onBid={openDefault} />
+      <Hero fund={fund} naming={fund.contributions.find((c) => c.tier === "naming")} onBid={openDefault} />
+      <Meters fund={fund} />
+      <HostageWall paid={fund.contributions} />
       <Leaderboard
         items={fund.contributions}
         onClaim={openBid}
         onRefresh={() => void query.refetch()}
       />
+      <SpendChart />
       <MoneyMade raisedCents={fund.raisedCents} />
       <SiteFooter />
       <ContributeDialog

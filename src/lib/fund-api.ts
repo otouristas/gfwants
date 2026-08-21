@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { getSql } from "@/lib/db";
+import { getSql, type Sql } from "@/lib/db";
 import { supabase, type SupabaseContribution } from "@/lib/supabase";
 import { STRIPE_PAY_URL } from "@/lib/stripe";
 import {
@@ -95,8 +95,51 @@ function mapSupabase(row: SupabaseContribution): Contribution {
     product_name: row.product_name,
     product_url: row.product_url,
     product_pitch: row.product_pitch,
+    click_count: row.click_count,
     created_at: row.created_at,
   });
+}
+
+async function trySql(): Promise<Sql | null> {
+  try {
+    return await getSql();
+  } catch {
+    return null;
+  }
+}
+
+type MemoryStore = {
+  contributions: Contribution[];
+  pending: Map<string, string>;
+  visitors: Map<string, number>;
+  visitorTotal: number;
+  nextId: number;
+};
+
+const memory: MemoryStore = ((globalThis as typeof globalThis & { __gfwantsMem?: MemoryStore })
+  .__gfwantsMem ??= {
+  contributions: [],
+  pending: new Map(),
+  visitors: new Map(),
+  visitorTotal: 3,
+  nextId: 100,
+});
+
+function seedMemory() {
+  if (memory.contributions.length > 0) return;
+  memory.contributions = PAID_SEED.map((row, i) => ({
+    id: i + 1,
+    amountCents: row.amount_cents,
+    tier: row.tier,
+    displayName: row.display_name,
+    xHandle: row.x_handle,
+    message: row.message,
+    productName: row.product_name,
+    productUrl: row.product_url,
+    productPitch: row.product_pitch,
+    clickCount: 0,
+    createdAt: new Date(Date.now() - (3 - i) * 60_000).toISOString(),
+  }));
 }
 
 async function readSupabase(): Promise<Contribution[] | null> {
@@ -149,7 +192,9 @@ async function seedSupabase() {
 
 async function ensureSeed() {
   await seedSupabase();
-  const sql = await getSql();
+  seedMemory();
+  const sql = await trySql();
+  if (!sql) return;
   await sql`
     create table if not exists fund_meta (
       k text primary key,
@@ -228,7 +273,13 @@ function payloadFrom(
 }
 
 async function visitorStats(): Promise<{ live: number; total: number }> {
-  const sql = await getSql();
+  const sql = await trySql();
+  if (!sql) {
+    const cutoff = Date.now() - 120_000;
+    let live = 0;
+    for (const ts of memory.visitors.values()) if (ts > cutoff) live += 1;
+    return { live: Math.max(1, live), total: Math.max(memory.visitorTotal, 1) };
+  }
   await sql`
     create table if not exists visitor_pings (
       visitor_id text primary key,
@@ -248,7 +299,13 @@ async function loadContributions(): Promise<Contribution[]> {
   if (remote && remote.length > 0) {
     return [...remote].sort((a, b) => b.amountCents - a.amountCents || Date.parse(a.createdAt) - Date.parse(b.createdAt));
   }
-  const sql = await getSql();
+  const sql = await trySql();
+  if (!sql) {
+    seedMemory();
+    return [...memory.contributions].sort(
+      (a, b) => b.amountCents - a.amountCents || Date.parse(a.createdAt) - Date.parse(b.createdAt),
+    );
+  }
   const rows = await sql<Row>`
     select id, amount_cents, tier, display_name, x_handle, message,
            product_name, product_url, product_pitch, click_count, created_at
@@ -329,7 +386,25 @@ async function insertListing(
     return { contribution: remote, raisedCents: all.reduce((s, c) => s + c.amountCents, 0) };
   }
 
-  const sql = await getSql();
+  const sql = await trySql();
+  if (!sql) {
+    const contribution: Contribution = {
+      id: memory.nextId++,
+      amountCents: listing.amountCents,
+      tier: listing.tier.id,
+      displayName: listing.displayName,
+      xHandle: listing.xHandle,
+      message: listing.message,
+      productName: listing.productName,
+      productUrl: listing.productUrl,
+      productPitch: listing.productPitch,
+      clickCount: 0,
+      createdAt: new Date().toISOString(),
+    };
+    memory.contributions.push(contribution);
+    const all = await loadContributions();
+    return { contribution, raisedCents: all.reduce((s, c) => s + c.amountCents, 0) };
+  }
   const inserted = await sql<Row>`
     insert into contributions (
       amount_cents, tier, display_name, x_handle, message,
@@ -363,10 +438,14 @@ export const createCheckout = createServerFn({ method: "POST" })
     listingFromDraft(data);
     await ensureSeed();
     const pendingId = crypto.randomUUID();
-    const sql = await getSql();
-    await sql`
-      insert into pending_payments (id, payload) values (${pendingId}, ${JSON.stringify(data)})
-    `;
+    const payload = JSON.stringify(data);
+    memory.pending.set(pendingId, payload);
+    const sql = await trySql();
+    if (sql) {
+      await sql`
+        insert into pending_payments (id, payload) values (${pendingId}, ${payload})
+      `;
+    }
     return {
       pendingId,
       url: `${STRIPE_PAY_URL}?client_reference_id=${encodeURIComponent(pendingId)}`,
@@ -374,7 +453,8 @@ export const createCheckout = createServerFn({ method: "POST" })
   });
 
 async function listingByStripeSession(sessionId: string): Promise<Contribution | null> {
-  const sql = await getSql();
+  const sql = await trySql();
+  if (!sql) return null;
   const rows = await sql<Row>`
     select id, amount_cents, tier, display_name, x_handle, message,
            product_name, product_url, product_pitch, click_count, created_at
@@ -397,15 +477,27 @@ export async function fulfillStripeSession(input: {
 
   let draft: ContributeInput | null = null;
   if (input.pendingId) {
-    const sql = await getSql();
-    const rows = await sql<{ payload: string }>`
-      select payload from pending_payments where id = ${input.pendingId} limit 1
-    `;
-    if (rows[0]?.payload) {
+    const cached = memory.pending.get(input.pendingId);
+    if (cached) {
       try {
-        draft = contributeSchema.parse(JSON.parse(rows[0].payload));
+        draft = contributeSchema.parse(JSON.parse(cached));
       } catch {
         draft = null;
+      }
+    }
+    if (!draft) {
+      const sql = await trySql();
+      if (sql) {
+        const rows = await sql<{ payload: string }>`
+          select payload from pending_payments where id = ${input.pendingId} limit 1
+        `;
+        if (rows[0]?.payload) {
+          try {
+            draft = contributeSchema.parse(JSON.parse(rows[0].payload));
+          } catch {
+            draft = null;
+          }
+        }
       }
     }
   }
@@ -434,7 +526,13 @@ export const pingVisitor = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ visitorId: z.string().trim().min(8).max(64) }).parse(data))
   .handler(async ({ data }) => {
     await ensureSeed();
-    const sql = await getSql();
+    const sql = await trySql();
+    if (!sql) {
+      const first = !memory.visitors.has(data.visitorId);
+      memory.visitors.set(data.visitorId, Date.now());
+      if (first) memory.visitorTotal += 1;
+      return visitorStats();
+    }
     const existing = await sql<{ visitor_id: string }>`
       select visitor_id from visitor_pings where visitor_id = ${data.visitorId} limit 1
     `;
@@ -457,7 +555,13 @@ export const registerClick = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.number().int() }).parse(data))
   .handler(async ({ data }): Promise<{ url: string }> => {
     await ensureSeed();
-    const sql = await getSql();
+    const sql = await trySql();
+    if (!sql) {
+      const hit = memory.contributions.find((c) => c.id === data.id);
+      if (!hit?.productUrl) throw new Error("No link on that rank");
+      hit.clickCount += 1;
+      return { url: hit.productUrl };
+    }
     const rows = await sql<{ product_url: string | null }>`
       update contributions set click_count = coalesce(click_count, 0) + 1
       where id = ${data.id}

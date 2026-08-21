@@ -17,6 +17,9 @@ const databaseUrl =
  * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
  */
 export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
+const onVercelWithoutDb = Boolean(
+  typeof process !== "undefined" && process.env.VERCEL && !databaseUrl,
+);
 
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
@@ -176,7 +179,11 @@ async function createSql(): Promise<Sql> {
         "or a server route loader, never from client code.",
     );
   }
-  return dbSource === "neon" ? createNeonSql() : createPgliteSql();
+  if (dbSource === "neon") return createNeonSql();
+  if (onVercelWithoutDb) {
+    throw new Error("PGLite is not available on Vercel without DATABASE_URL");
+  }
+  return createPgliteSql();
 }
 
 /**
@@ -220,8 +227,12 @@ export async function getPglite(): Promise<import("@electric-sql/pglite").PGlite
  * module kick it off immediately (see bottom of file).
  */
 export function ensureDbReady(): Promise<void> {
-  if (dbSource !== "pglite") return Promise.resolve();
-  return getSql().then(() => undefined);
+  if (dbSource !== "pglite" || onVercelWithoutDb) return Promise.resolve();
+  return getSql()
+    .then(() => undefined)
+    .catch((err) => {
+      console.error("[db] PGLite bootstrap failed:", err);
+    });
 }
 
 // Server-only eager start: kick PGLite bootstrap as soon as this module loads in
@@ -229,10 +240,9 @@ export function ensureDbReady(): Promise<void> {
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
 };
-if (typeof window === "undefined" && dbSource === "pglite") {
+if (typeof window === "undefined" && dbSource === "pglite" && !onVercelWithoutDb) {
   globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
     globalBoot.__pgBootstrapPromise__ = undefined;
     console.error("[db] PGLite bootstrap failed:", err);
-    throw err;
   });
 }

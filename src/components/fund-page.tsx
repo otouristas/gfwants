@@ -1,12 +1,17 @@
 import { useEffect, useState, type MouseEvent } from "react";
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight, RefreshCw } from "lucide-react";
+import { RefreshCw, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   FEATURED_BRANDS,
   LEAVE_AT,
   OWNER_HANDLE,
+  SPEND_BARS,
   UNFINISHED_PROJECTS,
+  UNLOCKS,
+  approvalScore,
+  approvalStatus,
   claimCents,
   formatMoney,
   hostFromUrl,
@@ -20,23 +25,51 @@ import { cn } from "@/lib/utils";
 
 export function Hero({
   fund,
+  naming,
   onBid,
 }: {
   fund: FundPayload;
+  naming?: Contribution;
   onBid: () => void;
 }) {
   return (
-    <header className="mx-auto max-w-4xl px-4 pt-8 pb-4 text-center sm:px-6 sm:pt-12">
-      <h1 className="sr-only">mygirlfriendisfurious.lol</h1>
+    <header className="mx-auto max-w-5xl px-4 pt-10 pb-6 sm:px-6 sm:pt-16">
       <LiveVisitors live={fund.liveVisitors} total={fund.visitorsSinceLaunch} />
-      <h2 className="mt-6 max-w-2xl mx-auto text-3xl leading-[1.1] font-medium tracking-tight sm:text-5xl">
-        Outbid everyone. Get on the homepage. Save the vacation.
-      </h2>
-      <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted">
-        We leave Monday. I spent the money on AI. Bid €1 or €10,000. Highest payer is #1. Your site
-        goes on this page. She is still packing.
+      <p className="mt-5 text-xs tracking-[0.18em] text-muted uppercase">
+        A personal financial disaster with a departure time
       </p>
+      <h1 className="mt-4 max-w-3xl text-4xl leading-[1.08] font-medium tracking-tight sm:text-6xl">
+        I promised my girlfriend a vacation. Then I discovered Claude, ChatGPT, Cursor, and 1,454 unfinished projects.
+      </h1>
+      {naming?.productName ? (
+        <p className="mt-4 text-sm text-accent">
+          This trip exists because of{" "}
+          {naming.productUrl ? (
+            <a
+              href={naming.productUrl}
+              target="_blank"
+              rel="sponsored noopener noreferrer"
+              className="underline decoration-border-strong underline-offset-4"
+            >
+              {naming.productName}
+            </a>
+          ) : (
+            naming.productName
+          )}
+          .
+        </p>
+      ) : null}
       <MondayClock />
+      <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
+        The trip exists. We leave Monday. Flights: booked. Hotel: booked. Vacation fund: currently an
+        apology with a progress bar. Claude needed Max. ChatGPT needed Plus. Cursor needed Pro. I
+        bought this domain with what was left. She is still coming. She is still furious.
+      </p>
+      <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">
+        If this overshoots, I will buy more AI Max and finish the pile. That is not a threat. That is
+        the business model. Bid €1 or €10,000. Highest payer is #1. Your website goes on this
+        homepage. We leave Monday.
+      </p>
       <Button className="mt-6 h-11 px-6" onClick={onBid}>
         Claim #1 for {formatMoney(claimCents(fund.contributions[0]?.amountCents))}
       </Button>
@@ -70,11 +103,123 @@ function MondayClock() {
   const mins = Math.floor((left % 3_600_000) / 60_000);
   const gone = left <= 0;
   return (
-    <p className="mt-4 font-mono text-sm tabular text-accent">
+    <p className="mt-6 font-mono text-sm tabular text-accent">
       {gone
         ? "We are supposed to be gone. Keep bidding. I will buy Max from the boat."
-        : `Boarding in ${days}d ${hours}h ${mins}m · Monday morning`}
+        : `Boarding in ${days}d ${hours}h ${mins}m · Monday morning · she has seen the tickets`}
     </p>
+  );
+}
+
+export function Meters({ fund }: { fund: FundPayload }) {
+  const score = approvalScore(fund.raisedCents);
+  const pct = Math.min(100, Math.round((fund.raisedCents / fund.goalCents) * 100));
+  return (
+    <section className="mx-auto grid max-w-5xl gap-4 px-4 sm:px-6 md:grid-cols-2">
+      <div className="rounded-xl bg-elevated p-5 shadow-[var(--shadow-border)] md:p-6">
+        <p className="text-xs tracking-wide text-muted uppercase">Relationship recovery fund</p>
+        <p className="mt-3 font-display text-4xl tracking-tight">{formatMoney(fund.raisedCents)}</p>
+        <p className="mt-1 text-sm text-muted">
+          of €10,000 · {fund.count} on the board · we leave Monday
+        </p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-subtle">
+          <div className="h-full bg-fg transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        </div>
+        <ul className="mt-5 grid grid-cols-2 gap-2">
+          {UNLOCKS.map((item) => {
+            const on = fund.raisedCents >= item.atCents;
+            return (
+              <li key={item.id} className="flex items-center gap-2 text-sm">
+                {on ? <Check className="size-4 text-fg" /> : <X className="size-4 text-faint" />}
+                <span className={on ? "text-fg" : "text-muted"}>{item.label}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+      <div className="rounded-xl bg-elevated p-5 shadow-[var(--shadow-border)] md:p-6">
+        <p className="text-xs tracking-wide text-muted uppercase">Girlfriend Approval Index</p>
+        <p className="mt-3 font-display text-4xl tracking-tight tabular">{score}/100</p>
+        <p className="mt-1 text-sm text-accent">{approvalStatus(score)}</p>
+        <div className="mt-5 h-2 overflow-hidden rounded-full bg-subtle">
+          <div className="h-full bg-accent transition-[width] duration-500" style={{ width: `${score}%` }} />
+        </div>
+        <p className="mt-5 text-sm leading-relaxed text-muted">
+          The index goes up when money comes in. If it overshoots, I buy more Max and attack the
+          1,454. She has been briefed. Do not make me explain a second dashboard.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export function HostageWall({ paid }: { paid: Contribution[] }) {
+  const paidHosts = new Set(
+    paid.filter((c) => c.productUrl).map((c) => hostFromUrl(c.productUrl!)),
+  );
+  return (
+    <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <h2 className="text-3xl font-medium tracking-tight">They already paid. I hope they pay the rest.</h2>
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted">
+        Three websites I already put on the apology. €50 each, on the board, paid. If you are one of
+        them: thank you. If you are not: outbid them.
+      </p>
+      <div className="mt-6 grid gap-3 md:grid-cols-3">
+        {FEATURED_BRANDS.map((brand) => {
+          const on = paidHosts.has(brand.host);
+          return (
+            <a
+              key={brand.id}
+              href={brand.url}
+              target="_blank"
+              rel="sponsored noopener noreferrer"
+              className="rounded-xl bg-elevated p-4 shadow-[var(--shadow-border)] transition-[box-shadow] duration-150 hover:shadow-[var(--shadow-border-hover)]"
+            >
+              <div className="flex items-start gap-3">
+                <img
+                  src={brand.logo}
+                  alt=""
+                  width={40}
+                  height={40}
+                  className="size-10 rounded-md bg-subtle object-contain"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium">{brand.name}</p>
+                    <Badge variant={on ? "default" : "mute"}>{on ? "Paid" : "Unpaid"}</Badge>
+                  </div>
+                  <p className="truncate text-xs text-faint">{brand.host}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-muted">{brand.pitch}</p>
+              <p className="mt-3 font-mono text-sm tabular">{formatMoney(brand.euros * 100)}</p>
+            </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function SpendChart() {
+  return (
+    <section className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
+      <h2 className="text-3xl font-medium tracking-tight">Where the money went</h2>
+      <p className="mt-2 text-sm text-muted">An honest visualization of a vacation that is happening anyway.</p>
+      <div className="mt-6 space-y-3 rounded-xl bg-elevated p-5 shadow-[var(--shadow-border)]">
+        {SPEND_BARS.map((bar) => (
+          <div key={bar.label}>
+            <div className="mb-1 flex justify-between text-sm">
+              <span>{bar.label}</span>
+              <span className="font-mono tabular text-muted">{bar.pct}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-subtle">
+              <div className="h-full bg-fg" style={{ width: `${bar.pct}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -93,8 +238,13 @@ export function Leaderboard({
   const slice = items.slice(page * per, page * per + per);
 
   return (
-    <section className="mx-auto w-full max-w-4xl flex-1 px-4 pb-4 sm:px-6">
-      <div className="overflow-hidden rounded-xl bg-elevated shadow-[var(--shadow-border)]">
+    <section id="board" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+      <h2 className="text-3xl font-medium tracking-tight">Hall of Relationship Saviors</h2>
+      <p className="mt-2 max-w-2xl text-sm text-muted">
+        Ranked by cash. Hover a row and steal it for €1 more. Your website, your pitch, your logo.
+        A completed payment is what claims the rank.
+      </p>
+      <div className="mt-6 overflow-hidden rounded-xl bg-elevated shadow-[var(--shadow-border)]">
         {slice.length === 0 ? (
           <p className="px-4 py-12 text-center text-sm text-muted">
             Empty board. €1 takes #1. We leave Monday.
@@ -152,7 +302,6 @@ export function Leaderboard({
 
 function RankRow({ item, rank }: { item: Contribution; rank: number }) {
   const host = item.productUrl ? hostFromUrl(item.productUrl) : null;
-  const href = item.productUrl ? `/go/${item.id}` : undefined;
   const title = host ?? item.productName ?? item.displayName;
   const pitch = item.productPitch || item.message;
 
@@ -210,10 +359,10 @@ function RankRow({ item, rank }: { item: Contribution; rank: number }) {
     </>
   );
 
-  if (href) {
+  if (item.productUrl) {
     return (
       <a
-        href={item.productUrl!}
+        href={item.productUrl}
         onClick={onClick}
         target="_blank"
         rel="sponsored noopener noreferrer"
@@ -230,7 +379,7 @@ function RankRow({ item, rank }: { item: Contribution; rank: number }) {
 export function MoneyMade({ raisedCents }: { raisedCents: number }) {
   const digits = formatMoney(raisedCents).replace("€", "").split("");
   return (
-    <section className="mt-14 flex flex-col items-center px-4" aria-live="polite">
+    <section className="mt-8 flex flex-col items-center px-4" aria-live="polite">
       <p className="mb-3 text-sm text-muted">
         This{" "}
         <Link to="/about" className="font-medium text-accent hover:text-fg">
@@ -257,7 +406,7 @@ export function MoneyMade({ raisedCents }: { raisedCents: number }) {
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 px-4 pb-8 text-center">
+    <footer className="mt-16 px-4 pb-10 text-center">
       <p className="text-sm text-muted">
         Built by{" "}
         <a
@@ -273,7 +422,7 @@ export function SiteFooter() {
           Rules
         </Link>
         {" · "}
-        Highest bid sits at #1. Pay more, take the rank.
+        Built in a sitting because I apparently have not learned my lesson.
       </p>
     </footer>
   );
@@ -299,5 +448,3 @@ export function BrandMark({ url, name }: { url?: string | null; name: string }) 
     </div>
   );
 }
-
-export { ArrowUpRight };
