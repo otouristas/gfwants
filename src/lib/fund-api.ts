@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql, type Sql } from "@/lib/db";
 import { supabase, type SupabaseContribution } from "@/lib/supabase";
-import { STRIPE_PAY_URL } from "@/lib/stripe";
 import {
   FEATURED_BRANDS,
   GOAL_CENTS,
@@ -452,7 +451,7 @@ export const contribute = createServerFn({ method: "POST" })
 export const createCheckout = createServerFn({ method: "POST" })
   .validator((data: unknown) => contributeSchema.parse(data))
   .handler(async ({ data }): Promise<{ url: string; pendingId: string }> => {
-    listingFromDraft(data);
+    const listing = listingFromDraft(data);
     await ensureSeed();
     const pendingId = crypto.randomUUID();
     const payload = JSON.stringify(data);
@@ -463,10 +462,19 @@ export const createCheckout = createServerFn({ method: "POST" })
         insert into pending_payments (id, payload) values (${pendingId}, ${payload})
       `;
     }
-    return {
+    if (!supabaseDown) {
+      await supabase().from("pending_payments").upsert({ id: pendingId, payload });
+    }
+    const { createBidCheckout } = await import("@/lib/stripe");
+    const url = await createBidCheckout({
       pendingId,
-      url: `${STRIPE_PAY_URL}?client_reference_id=${encodeURIComponent(pendingId)}`,
-    };
+      amountCents: listing.amountCents,
+      displayName: listing.displayName,
+      productName: listing.productName,
+      productUrl: listing.productUrl,
+      message: listing.message,
+    });
+    return { pendingId, url };
   });
 
 async function listingByStripeSession(sessionId: string): Promise<Contribution | null> {
@@ -538,6 +546,27 @@ export async function fulfillStripeSession(input: {
   const result = await insertListing(listingFromDraft(draft), input.sessionId);
   return { contribution: result.contribution, duplicate: false };
 }
+
+export const completeCheckout = createServerFn({ method: "GET" })
+  .validator((data: unknown) =>
+    z.object({ sessionId: z.string().min(8), pendingId: z.string().optional() }).parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { paidSession } = await import("@/lib/stripe");
+    const paid = await paidSession(data.sessionId);
+    if (!paid) return { ok: false as const, amountCents: 0 };
+    const result = await fulfillStripeSession({
+      sessionId: data.sessionId,
+      pendingId: paid.pendingId ?? data.pendingId ?? null,
+      amountCents: paid.amountCents,
+      customerName: paid.customerName,
+    });
+    return {
+      ok: true as const,
+      amountCents: result.contribution?.amountCents ?? paid.amountCents,
+      displayName: result.contribution?.displayName ?? paid.customerName ?? "Anonymous",
+    };
+  });
 
 export const pingVisitor = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ visitorId: z.string().trim().min(8).max(64) }).parse(data))
