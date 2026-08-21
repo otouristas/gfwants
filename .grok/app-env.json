@@ -1,0 +1,5 @@
+{
+  "VITE_AUTH_ENABLED": "false",
+  "VITE_SUPABASE_URL": "https://xfhgdufuareuhyjdwcbp.supabase.co",
+  "VITE_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_wfBaCBVzj_-Ge6awA91cBA_DTO1ents"
+}
