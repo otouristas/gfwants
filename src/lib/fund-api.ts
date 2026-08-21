@@ -6,11 +6,14 @@ import { STRIPE_PAY_URL } from "@/lib/stripe";
 import {
   FEATURED_BRANDS,
   GOAL_CENTS,
+  MAX_BID_CENTS,
+  MIN_BID_CENTS,
   TIER_BY_ID,
   TIERS,
   isTierId,
   sanitizeHandle,
   sanitizeUrl,
+  tierForAmount,
   type Contribution,
   type FundPayload,
   type TierId,
@@ -26,6 +29,7 @@ type Row = {
   product_name: string | null;
   product_url: string | null;
   product_pitch: string | null;
+  click_count?: number | null;
   created_at: Date | string;
 };
 
@@ -75,6 +79,7 @@ function mapRow(row: Row): Contribution {
     productName: row.product_name,
     productUrl: row.product_url,
     productPitch: row.product_pitch,
+    clickCount: Number(row.click_count ?? 0),
     createdAt: iso(row.created_at),
   };
 }
@@ -98,7 +103,7 @@ async function readSupabase(): Promise<Contribution[] | null> {
   const { data, error } = await supabase()
     .from("contributions")
     .select(
-      "id, amount_cents, tier, display_name, x_handle, message, product_name, product_url, product_pitch, stripe_session_id, created_at",
+      "id, amount_cents, tier, display_name, x_handle, message, product_name, product_url, product_pitch, stripe_session_id, created_at, click_count",
     )
     .order("amount_cents", { ascending: false })
     .order("created_at", { ascending: true });
@@ -113,7 +118,7 @@ async function insertSupabase(
   const { data, error } = await supabase()
     .from("contributions")
     .insert({
-      amount_cents: listing.tier.dollars * 100,
+      amount_cents: listing.amountCents,
       tier: listing.tier.id,
       display_name: listing.displayName,
       x_handle: listing.xHandle,
@@ -152,11 +157,18 @@ async function ensureSeed() {
     )
   `;
   await sql`alter table contributions add column if not exists stripe_session_id text`;
+  await sql`alter table contributions add column if not exists click_count integer not null default 0`;
   await sql`
     create table if not exists pending_payments (
       id text primary key,
       payload text not null,
       created_at timestamptz not null default now()
+    )
+  `;
+  await sql`
+    create table if not exists visitor_pings (
+      visitor_id text primary key,
+      seen_at timestamptz not null default now()
     )
   `;
   const rows = await sql<{ v: string }>`select v from fund_meta where k = 'seed'`;
@@ -198,7 +210,11 @@ function remainingFrom(contributions: Contribution[]): Partial<Record<TierId, nu
   return remaining;
 }
 
-function payloadFrom(contributions: Contribution[]): FundPayload {
+function payloadFrom(
+  contributions: Contribution[],
+  liveVisitors: number,
+  visitorsSinceLaunch: number,
+): FundPayload {
   const raisedCents = contributions.reduce((sum, c) => sum + c.amountCents, 0);
   return {
     raisedCents,
@@ -206,17 +222,36 @@ function payloadFrom(contributions: Contribution[]): FundPayload {
     count: contributions.length,
     contributions,
     remaining: remainingFrom(contributions),
+    liveVisitors,
+    visitorsSinceLaunch,
   };
+}
+
+async function visitorStats(): Promise<{ live: number; total: number }> {
+  const sql = await getSql();
+  await sql`
+    create table if not exists visitor_pings (
+      visitor_id text primary key,
+      seen_at timestamptz not null default now()
+    )
+  `;
+  await sql`delete from visitor_pings where seen_at < now() - interval '2 minutes'`;
+  const liveRows = await sql<{ n: number }>`select count(*)::int as n from visitor_pings`;
+  const totalRows = await sql<{ v: string }>`select v from fund_meta where k = 'visitors'`;
+  const total = Number(totalRows[0]?.v ?? 0);
+  return { live: Math.max(1, Number(liveRows[0]?.n ?? 0)), total: Math.max(total, 1) };
 }
 
 async function loadContributions(): Promise<Contribution[]> {
   await ensureSeed();
   const remote = await readSupabase();
-  if (remote && remote.length > 0) return remote;
+  if (remote && remote.length > 0) {
+    return [...remote].sort((a, b) => b.amountCents - a.amountCents || Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  }
   const sql = await getSql();
   const rows = await sql<Row>`
     select id, amount_cents, tier, display_name, x_handle, message,
-           product_name, product_url, product_pitch, created_at
+           product_name, product_url, product_pitch, click_count, created_at
     from contributions
     order by amount_cents desc, created_at asc
   `;
@@ -224,7 +259,9 @@ async function loadContributions(): Promise<Contribution[]> {
 }
 
 export const getFund = createServerFn({ method: "GET" }).handler(async (): Promise<FundPayload> => {
-  return payloadFrom(await loadContributions());
+  const contributions = await loadContributions();
+  const visitors = await visitorStats();
+  return payloadFrom(contributions, visitors.live, visitors.total);
 });
 
 const contributeSchema = z.object({
@@ -241,6 +278,7 @@ const contributeSchema = z.object({
     "official",
     "naming",
   ]),
+  amountCents: z.number().int().min(MIN_BID_CENTS).max(MAX_BID_CENTS),
   displayName: z.string().trim().max(32),
   xHandle: z.string().trim().max(20),
   message: z.string().trim().max(140),
@@ -253,7 +291,8 @@ const contributeSchema = z.object({
 type ContributeInput = z.infer<typeof contributeSchema>;
 
 function listingFromDraft(data: ContributeInput) {
-  const tier = TIER_BY_ID[data.tier];
+  const amountCents = data.amountCents;
+  const tier = TIER_BY_ID[tierForAmount(amountCents)];
   const displayName = data.anonymous || !data.displayName ? "Anonymous" : data.displayName;
   if (!data.anonymous && displayName.length < 2) {
     throw new Error("Name needs two characters, or go anonymous");
@@ -262,15 +301,13 @@ function listingFromDraft(data: ContributeInput) {
   let productName: string | null = data.productName || null;
   let productUrl: string | null = null;
   let productPitch: string | null = data.productPitch || null;
-  if (tier.requiresProduct) {
-    if (!productName || productName.length < 2) throw new Error("Add the product you want on the wall");
-    productUrl = sanitizeUrl(data.productUrl);
-  } else if (data.productUrl.trim()) {
+  if (data.productUrl.trim()) {
     productUrl = sanitizeUrl(data.productUrl);
     productName = productName || displayName;
   }
   return {
     tier,
+    amountCents,
     displayName,
     xHandle,
     message: data.message,
@@ -285,11 +322,6 @@ async function insertListing(
   stripeSessionId: string | null,
 ): Promise<{ contribution: Contribution; raisedCents: number }> {
   await ensureSeed();
-  const current = await loadContributions();
-  if (listing.tier.limit != null) {
-    const left = remainingFrom(current)[listing.tier.id] ?? 0;
-    if (left <= 0) throw new Error(`${listing.tier.label} is sold out. That is the point.`);
-  }
 
   const remote = await insertSupabase(listing, stripeSessionId);
   if (remote) {
@@ -303,7 +335,7 @@ async function insertListing(
       amount_cents, tier, display_name, x_handle, message,
       product_name, product_url, product_pitch, stripe_session_id
     ) values (
-      ${listing.tier.dollars * 100},
+      ${listing.amountCents},
       ${listing.tier.id},
       ${listing.displayName},
       ${listing.xHandle},
@@ -314,7 +346,7 @@ async function insertListing(
       ${stripeSessionId}
     )
     returning id, amount_cents, tier, display_name, x_handle, message,
-              product_name, product_url, product_pitch, created_at
+              product_name, product_url, product_pitch, click_count, created_at
   `;
   const contribution = mapRow(inserted[0]!);
   const all = await loadContributions();
@@ -345,7 +377,7 @@ async function listingByStripeSession(sessionId: string): Promise<Contribution |
   const sql = await getSql();
   const rows = await sql<Row>`
     select id, amount_cents, tier, display_name, x_handle, message,
-           product_name, product_url, product_pitch, created_at
+           product_name, product_url, product_pitch, click_count, created_at
     from contributions
     where stripe_session_id = ${sessionId}
     limit 1
@@ -381,16 +413,57 @@ export async function fulfillStripeSession(input: {
   if (!draft) {
     draft = {
       tier: "honeymoon",
+      amountCents: input.amountCents && input.amountCents >= MIN_BID_CENTS ? input.amountCents : 10_000,
       displayName: input.customerName || "Anonymous",
       xHandle: "",
-      message: "Paid on Stripe.",
+      message: "Paid.",
       productName: "",
       productUrl: "",
       productPitch: "",
       anonymous: !input.customerName,
     };
+  } else if (input.amountCents && input.amountCents >= MIN_BID_CENTS) {
+    draft = { ...draft, amountCents: input.amountCents, tier: tierForAmount(input.amountCents) };
   }
 
   const result = await insertListing(listingFromDraft(draft), input.sessionId);
   return { contribution: result.contribution, duplicate: false };
 }
+
+export const pingVisitor = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ visitorId: z.string().trim().min(8).max(64) }).parse(data))
+  .handler(async ({ data }) => {
+    await ensureSeed();
+    const sql = await getSql();
+    const existing = await sql<{ visitor_id: string }>`
+      select visitor_id from visitor_pings where visitor_id = ${data.visitorId} limit 1
+    `;
+    await sql`
+      insert into visitor_pings (visitor_id, seen_at) values (${data.visitorId}, now())
+      on conflict (visitor_id) do update set seen_at = now()
+    `;
+    if (!existing[0]) {
+      const rows = await sql<{ v: string }>`select v from fund_meta where k = 'visitors'`;
+      const next = String(Number(rows[0]?.v ?? 0) + 1);
+      await sql`
+        insert into fund_meta (k, v) values ('visitors', ${next})
+        on conflict (k) do update set v = excluded.v
+      `;
+    }
+    return visitorStats();
+  });
+
+export const registerClick = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({ id: z.number().int() }).parse(data))
+  .handler(async ({ data }): Promise<{ url: string }> => {
+    await ensureSeed();
+    const sql = await getSql();
+    const rows = await sql<{ product_url: string | null }>`
+      update contributions set click_count = coalesce(click_count, 0) + 1
+      where id = ${data.id}
+      returning product_url
+    `;
+    const url = rows[0]?.product_url;
+    if (!url) throw new Error("No link on that rank");
+    return { url };
+  });

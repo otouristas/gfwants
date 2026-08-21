@@ -12,18 +12,20 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createCheckout } from "@/lib/fund-api";
-import { STRIPE_CHARGE_CENTS } from "@/lib/stripe";
+import { contribute, createCheckout } from "@/lib/fund-api";
 import {
-  TIER_BY_ID,
-  approvalScore,
+  MAX_BID_CENTS,
+  MIN_BID_CENTS,
+  QUICK_BIDS,
+  WISE_QR,
+  WISE_TAG,
   formatMoney,
-  shareText,
   type TierId,
 } from "@/lib/fund";
 
 export type ContributeDraft = {
   tier: TierId;
+  amountCents: number;
   displayName: string;
   xHandle: string;
   message: string;
@@ -39,20 +41,24 @@ type Props = {
   draft: ContributeDraft;
   onDraftChange: (next: ContributeDraft) => void;
   onSettled: () => void;
+  claimRank?: number;
 };
 
-export function ContributeDialog({ open, onOpenChange, draft, onDraftChange, onSettled }: Props) {
+export function ContributeDialog({
+  open,
+  onOpenChange,
+  draft,
+  onDraftChange,
+  onSettled,
+  claimRank,
+}: Props) {
   const [busy, setBusy] = useState(false);
-  const [phase, setPhase] = useState<"form" | "done">("form");
   const [agreed, setAgreed] = useState(false);
-  const [paid, setPaid] = useState<{ amount: number; score: number } | null>(null);
-  const tier = TIER_BY_ID[draft.tier];
+  const euros = Math.round(draft.amountCents / 100);
 
   useEffect(() => {
     if (open) {
-      setPhase("form");
       setBusy(false);
-      setPaid(null);
       setAgreed(false);
     }
   }, [open]);
@@ -60,6 +66,7 @@ export function ContributeDialog({ open, onOpenChange, draft, onDraftChange, onS
   function payload() {
     return {
       tier: draft.tier,
+      amountCents: draft.amountCents,
       displayName: draft.displayName,
       xHandle: draft.xHandle,
       message: draft.message,
@@ -70,11 +77,12 @@ export function ContributeDialog({ open, onOpenChange, draft, onDraftChange, onS
     };
   }
 
+  function setEuros(value: number) {
+    const next = Math.min(MAX_BID_CENTS / 100, Math.max(MIN_BID_CENTS / 100, Math.round(value)));
+    onDraftChange({ ...draft, amountCents: next * 100 });
+  }
+
   async function payStripe() {
-    if (tier.requiresProduct && draft.productUrl.trim().length < 3) {
-      toast.error("Sponsors put a URL on the wall. That is the product.");
-      return;
-    }
     if (!agreed) {
       toast.error("Agree to the rules first. They are short.");
       return;
@@ -85,154 +93,169 @@ export function ContributeDialog({ open, onOpenChange, draft, onDraftChange, onS
       window.location.assign(checkout.url);
     } catch (err) {
       setBusy(false);
-      toast.error(err instanceof Error ? err.message : "Stripe failed");
+      toast.error(err instanceof Error ? err.message : "Card checkout failed");
     }
   }
 
-  function share() {
-    if (!paid) return;
-    void navigator.clipboard.writeText(shareText(paid.amount, paid.score)).then(
-      () => toast.success("Copied. Post it before she sees the domain."),
-      () => toast.error("Could not copy"),
-    );
+  async function paidOnWise() {
+    if (!agreed) {
+      toast.error("Agree to the rules first. They are short.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await contribute({ data: payload() });
+      onSettled();
+      onOpenChange(false);
+      toast.success("You are on the board. I will check Wise.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not add you");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[92dvh] overflow-y-auto">
-        {phase === "done" && paid ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Sending you to Stripe</DialogTitle>
-              <DialogDescription>
-                {formatMoney(STRIPE_CHARGE_CENTS)} on card. Money goes to Touristas AI. We leave Monday.
-              </DialogDescription>
-            </DialogHeader>
-            <Button onClick={share}>Copy the brag</Button>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>{tier.label}</DialogTitle>
-              <DialogDescription>{tier.punch}</DialogDescription>
-            </DialogHeader>
+        <DialogHeader>
+          <DialogTitle>
+            {claimRank
+              ? `Claim #${claimRank} for ${formatMoney(draft.amountCents)}`
+              : `Bid ${formatMoney(draft.amountCents)}`}
+          </DialogTitle>
+          <DialogDescription>
+            Any amount from €1 to €10,000. Highest payer sits at #1. Your website goes on the homepage.
+          </DialogDescription>
+        </DialogHeader>
 
-            <div className="flex items-end justify-between rounded-lg bg-subtle px-4 py-3 shadow-[var(--shadow-border)]">
-              <div>
-                <p className="text-xs tracking-wide text-muted uppercase">Stripe charges</p>
-                <p className="font-mono text-2xl tabular">{formatMoney(STRIPE_CHARGE_CENTS)}</p>
-              </div>
-              <p className="max-w-[12rem] text-right text-xs text-muted">
-                Live card checkout. Touristas AI. {tier.placement}
-              </p>
-            </div>
+        <div>
+          <Label>Your bid</Label>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className="text-lg font-medium">€</span>
+            <Input
+              type="number"
+              min={1}
+              max={10000}
+              step={1}
+              value={euros}
+              onChange={(e) => setEuros(Number(e.target.value) || 1)}
+              className="font-mono text-lg"
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {QUICK_BIDS.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setEuros(n)}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                  euros === n ? "bg-fg text-bg" : "bg-subtle text-muted hover:text-fg"
+                }`}
+              >
+                €{n.toLocaleString("en-US")}
+              </button>
+            ))}
+          </div>
+        </div>
 
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={draft.anonymous}
-                onChange={(e) => onDraftChange({ ...draft, anonymous: e.target.checked })}
-                className="size-4 accent-fg"
-              />
-              Stay anonymous
-            </label>
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={draft.anonymous}
+            onChange={(e) => onDraftChange({ ...draft, anonymous: e.target.checked })}
+            className="size-4 accent-fg"
+          />
+          Stay anonymous
+        </label>
 
-            {!draft.anonymous ? (
-              <div className="grid gap-3">
-                <Field label="Name on the wall">
-                  <Input
-                    value={draft.displayName}
-                    autoComplete="off"
-                    placeholder="Your name or brand"
-                    onChange={(e) => onDraftChange({ ...draft, displayName: e.target.value })}
-                  />
-                </Field>
-                <Field label="X handle">
-                  <Input
-                    value={draft.xHandle}
-                    autoComplete="off"
-                    placeholder="@handle"
-                    onChange={(e) => onDraftChange({ ...draft, xHandle: e.target.value })}
-                  />
-                </Field>
-              </div>
-            ) : null}
+        {!draft.anonymous ? (
+          <Field label="Name on the board">
+            <Input
+              value={draft.displayName}
+              autoComplete="off"
+              placeholder="Your name or brand"
+              onChange={(e) => onDraftChange({ ...draft, displayName: e.target.value })}
+            />
+          </Field>
+        ) : null}
 
-            <Field label="Message">
-              <Input
-                value={draft.message}
-                autoComplete="off"
-                placeholder="Stop buying AI tools."
-                onChange={(e) => onDraftChange({ ...draft, message: e.target.value })}
-              />
-            </Field>
+        <Field label="Website — this is how you get traffic">
+          <Input
+            value={draft.productUrl}
+            autoComplete="off"
+            inputMode="url"
+            placeholder="https://yoursite.com"
+            onChange={(e) => onDraftChange({ ...draft, productUrl: e.target.value })}
+          />
+        </Field>
+        <Field label="One-line pitch">
+          <Input
+            value={draft.productPitch || draft.message}
+            autoComplete="off"
+            placeholder="Why a stranger should click you"
+            onChange={(e) =>
+              onDraftChange({ ...draft, productPitch: e.target.value, message: e.target.value })
+            }
+          />
+        </Field>
+        <Field label="Product name">
+          <Input
+            value={draft.productName}
+            autoComplete="off"
+            placeholder="Acme"
+            onChange={(e) => onDraftChange({ ...draft, productName: e.target.value })}
+          />
+        </Field>
 
-            {tier.requiresProduct || tier.dollars >= 25 ? (
-              <div className="grid gap-3 rounded-lg bg-subtle p-3 shadow-[var(--shadow-border)]">
-                <p className="text-xs font-medium tracking-wide text-muted uppercase">
-                  {tier.requiresProduct ? "Your product, on this page" : "Optional product plug"}
-                </p>
-                <Field label="Product">
-                  <Input
-                    value={draft.productName}
-                    autoComplete="off"
-                    placeholder="Acme"
-                    onChange={(e) => onDraftChange({ ...draft, productName: e.target.value })}
-                  />
-                </Field>
-                <Field label="Website">
-                  <Input
-                    value={draft.productUrl}
-                    autoComplete="off"
-                    inputMode="url"
-                    placeholder="https://yoursite.com"
-                    onChange={(e) => onDraftChange({ ...draft, productUrl: e.target.value })}
-                  />
-                </Field>
-                <Field label="One-line pitch">
-                  <Input
-                    value={draft.productPitch}
-                    autoComplete="off"
-                    placeholder="Why a stranger should click you"
-                    onChange={(e) => onDraftChange({ ...draft, productPitch: e.target.value })}
-                  />
-                </Field>
-              </div>
-            ) : null}
+        <label className="flex items-start gap-2 text-sm leading-snug">
+          <input
+            type="checkbox"
+            checked={agreed}
+            onChange={(e) => setAgreed(e.target.checked)}
+            className="mt-0.5 size-4 accent-fg"
+          />
+          <span>
+            I agree to the{" "}
+            <Link
+              to="/rules"
+              className="underline decoration-border-strong underline-offset-2"
+              onClick={() => onOpenChange(false)}
+            >
+              rules
+            </Link>
+            . Not a charity. No refunds. Rank is cash.
+          </span>
+        </label>
 
-            <label className="flex items-start gap-2 text-sm leading-snug">
-              <input
-                type="checkbox"
-                checked={agreed}
-                onChange={(e) => setAgreed(e.target.checked)}
-                className="mt-0.5 size-4 accent-fg"
-              />
-              <span>
-                I agree to the{" "}
-                <Link
-                  to="/rules"
-                  className="underline decoration-border-strong underline-offset-2"
-                  onClick={() => onOpenChange(false)}
-                >
-                  rules
-                </Link>
-                . Not a charity. No refunds. Card is Stripe. €100 lands in Touristas AI.
-              </span>
-            </label>
+        <Button className="h-12 w-full" disabled={busy} onClick={() => void payStripe()}>
+          {busy ? (
+            <>
+              <LoaderCircle className="size-4 animate-spin" />
+              Opening card checkout
+            </>
+          ) : euros === 100 ? (
+            "Pay €100 with card"
+          ) : (
+            `Pay ${formatMoney(draft.amountCents)} — card, then you hit the board`
+          )}
+        </Button>
+        <p className="text-center text-xs text-faint">
+          {euros === 100
+            ? "Visa, Mastercard, Apple Pay. You land on the board when the charge succeeds."
+            : "Card checkout is live. For a custom number that is not €100, Wise is exact."}
+        </p>
 
-            <Button className="h-12 w-full" disabled={busy} onClick={() => void payStripe()}>
-              {busy ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin" />
-                  Opening Stripe
-                </>
-              ) : (
-                `Pay ${formatMoney(STRIPE_CHARGE_CENTS)} with card`
-              )}
-            </Button>
-            <p className="text-center text-xs text-faint">Visa, Mastercard, Apple Pay. Stripe. We leave Monday.</p>
-          </>
-        )}
+        <div className="grid gap-3 rounded-lg bg-subtle p-3">
+          <p className="text-sm font-medium">Faster: send {formatMoney(draft.amountCents)} on Wise</p>
+          <p className="text-xs text-muted">
+            @{WISE_TAG}. Any amount. Then tap the button so you show up on the homepage.
+          </p>
+          <img src={WISE_QR} alt={`Wise @${WISE_TAG}`} className="mx-auto w-40 rounded-md" />
+          <Button variant="outline" disabled={busy} onClick={() => void paidOnWise()}>
+            I sent {formatMoney(draft.amountCents)} on Wise — put me on the board
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

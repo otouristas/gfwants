@@ -31,7 +31,7 @@ function AboutPage() {
             homepage, we still board, and everybody gets a screenshot.
           </p>
           <p>
-            Card payments go through Stripe, to Touristas AI. This is a humorous personal project. Not a
+            Card is Stripe. Wise is faster. This is a humorous personal project. Not a
             charity. Not tax deductible. I will not send you a receipt that looks like a 501(c)(3).
           </p>
           <p>

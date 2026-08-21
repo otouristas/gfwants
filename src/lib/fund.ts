@@ -192,6 +192,10 @@ export const LOGO_BY_HOST: Record<string, string> = Object.fromEntries(
   FEATURED_BRANDS.map((b) => [b.host, b.logo]),
 );
 
+export const MIN_BID_CENTS = 100;
+export const MAX_BID_CENTS = 1_000_000;
+export const QUICK_BIDS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 10_000];
+
 export type Contribution = {
   id: number;
   amountCents: number;
@@ -202,6 +206,7 @@ export type Contribution = {
   productName: string | null;
   productUrl: string | null;
   productPitch: string | null;
+  clickCount: number;
   createdAt: string;
 };
 
@@ -211,11 +216,39 @@ export type FundPayload = {
   count: number;
   contributions: Contribution[];
   remaining: Partial<Record<TierId, number>>;
+  liveVisitors: number;
+  visitorsSinceLaunch: number;
 };
 
 export function formatMoney(cents: number): string {
   const euros = Math.round(cents / 100);
   return `€${euros.toLocaleString("en-US")}`;
+}
+
+export function claimCents(rankAmountCents: number | undefined): number {
+  if (!rankAmountCents) return MIN_BID_CENTS;
+  return Math.min(MAX_BID_CENTS, rankAmountCents + 100);
+}
+
+export function tierForAmount(cents: number): TierId {
+  const sorted = [...TIERS].sort((a, b) => b.dollars - a.dollars);
+  return sorted.find((t) => cents >= t.dollars * 100)?.id ?? "coffee";
+}
+
+export function timeAgo(iso: string): string {
+  const delta = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(delta) || delta < 45_000) return "just now";
+  if (delta < 3_600_000) {
+    const n = Math.max(1, Math.round(delta / 60_000));
+    return `${n} minute${n === 1 ? "" : "s"} ago`;
+  }
+  if (delta < 86_400_000) {
+    const n = Math.max(1, Math.round(delta / 3_600_000));
+    return `${n} hour${n === 1 ? "" : "s"} ago`;
+  }
+  if (delta < 172_800_000) return "yesterday";
+  const n = Math.round(delta / 86_400_000);
+  return `${n} days ago`;
 }
 
 export function approvalScore(raisedCents: number): number {
@@ -354,7 +387,9 @@ export function hostFromUrl(url: string): string {
 
 export function logoForUrl(url: string | null | undefined): string | null {
   if (!url) return null;
-  return LOGO_BY_HOST[hostFromUrl(url)] ?? null;
+  const host = hostFromUrl(url);
+  if (LOGO_BY_HOST[host]) return LOGO_BY_HOST[host];
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
 }
 
 export function shareText(amountCents: number, score: number): string {
