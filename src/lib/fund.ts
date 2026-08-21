@@ -6,17 +6,15 @@ export const UNFINISHED_PROJECTS = 1454;
 export const LEAVE_AT = Date.UTC(2026, 7, 24, 5, 0, 0); // Monday 08:00 EEST
 
 export type TierId =
-  | "coffee"
-  | "api"
-  | "cocktail"
-  | "doghouse"
-  | "ryanair"
-  | "honeymoon"
-  | "wall"
-  | "funded"
-  | "dinner"
-  | "official"
-  | "naming";
+  | "moral"
+  | "link"
+  | "nice"
+  | "featured"
+  | "datenight"
+  | "partner"
+  | "saver"
+  | "naming"
+  | "wall";
 
 export type Tier = {
   id: TierId;
@@ -31,116 +29,98 @@ export type Tier = {
 
 export const TIERS: Tier[] = [
   {
-    id: "coffee",
-    dollars: 2,
-    label: "Coffee at the gate",
-    punch: "Buy her a coffee. Does not buy you forgiveness. We still leave Monday.",
-    kind: "impulse",
-    requiresProduct: false,
-    limit: null,
-    placement: "Name on the Hall of Saviors",
-  },
-  {
-    id: "api",
+    id: "moral",
     dollars: 5,
-    label: "Undo one API call",
-    punch: "Morally equivalent to deleting a receipt. I have 1,454 more ideas after this.",
+    label: "Moral Support",
+    punch: "The €5 hero. If the two Relationship Savers and the Naming Rights sell, you close the €10,000. Technically.",
     kind: "impulse",
     requiresProduct: false,
     limit: null,
     placement: "Name on the Hall of Saviors",
   },
   {
-    id: "cocktail",
-    dollars: 10,
-    label: "One cocktail",
-    punch: "The drink I promised. You are buying it here. I will not spend it on Max. Probably.",
-    kind: "impulse",
-    requiresProduct: false,
+    id: "link",
+    dollars: 29,
+    label: "Permanent sponsored link",
+    punch: "Your website lives on this homepage. rel=sponsored. Cheap, permanent, slightly unhinged.",
+    kind: "sponsor",
+    requiresProduct: true,
     limit: null,
-    placement: "Name + optional message",
+    placement: "Permanent sponsored website / product link",
   },
   {
-    id: "doghouse",
-    dollars: 25,
-    label: "Out of the doghouse",
-    punch: "A message on the wall. Optional product link. Cheap attention before Monday.",
-    kind: "impulse",
-    requiresProduct: false,
+    id: "nice",
+    dollars: 69,
+    label: "Nice Sponsor",
+    punch: "Bigger card. Favicon. Pitch. People will screenshot you next to the apology.",
+    kind: "sponsor",
+    requiresProduct: true,
     limit: null,
-    placement: "Wall + optional sponsored link",
+    placement: "Nice Sponsor card",
   },
   {
-    id: "ryanair",
-    dollars: 50,
-    label: "Upgrade from Ryanair",
-    punch: "Assigned seats. A product link if you have something to sell.",
-    kind: "impulse",
-    requiresProduct: false,
+    id: "featured",
+    dollars: 149,
+    label: "Featured Product",
+    punch: "Above the cheap seats. Your product, your URL, your one-line lie about helping a couple go to Greece.",
+    kind: "sponsor",
+    requiresProduct: true,
     limit: null,
-    placement: "Wall + optional sponsored link",
+    placement: "Featured product block",
   },
   {
-    id: "honeymoon",
-    dollars: 100,
-    label: "Honeymoon planner",
-    punch: "You basically planned the trip. Your site can sit next to that fact.",
-    kind: "impulse",
-    requiresProduct: false,
+    id: "datenight",
+    dollars: 299,
+    label: "Date Night Sponsor",
+    punch: "One dinner in Greece, billed to your brand. The only ad that might save a relationship.",
+    kind: "sponsor",
+    requiresProduct: true,
     limit: null,
-    placement: "Highlighted savior + optional product",
+    placement: "Date Night sponsor",
+  },
+  {
+    id: "partner",
+    dollars: 999,
+    label: "Vacation Partner",
+    punch: "Homepage credit: this vacation is partnered with you. Fat placement. We still leave Monday.",
+    kind: "sponsor",
+    requiresProduct: true,
+    limit: null,
+    placement: "Vacation Partner strip",
+  },
+  {
+    id: "saver",
+    dollars: 2499,
+    label: "Relationship Saver",
+    punch: "Two slots. You are why we might actually board. Hero placement. Sold out means sold out.",
+    kind: "sponsor",
+    requiresProduct: true,
+    limit: 2,
+    placement: "Hero Relationship Saver",
+  },
+  {
+    id: "naming",
+    dollars: 4999,
+    label: "Vacation Naming Rights",
+    punch: "One slot. The headline becomes: this trip exists because of you. That is how we hit €10,000.",
+    kind: "sponsor",
+    requiresProduct: true,
+    limit: 1,
+    placement: "Headline naming rights",
   },
   {
     id: "wall",
     dollars: 50,
-    label: "Product on the wall",
-    punch: "Your website, pitch, and logo on this homepage. €50. rel=sponsored. We leave Monday.",
+    label: "Paid brand on the wall",
+    punch: "The three who already paid.",
     kind: "sponsor",
     requiresProduct: true,
     limit: null,
-    placement: "Sponsored product card + backlink",
-  },
-  {
-    id: "funded",
-    dollars: 99,
-    label: "Partially funded by you",
-    punch: "Homepage line: this vacation is partially funded by [your brand]. Plus a fat product card.",
-    kind: "sponsor",
-    requiresProduct: true,
-    limit: 12,
-    placement: "Homepage credit + product card",
-  },
-  {
-    id: "dinner",
-    dollars: 199,
-    label: "Sponsor a dinner",
-    punch: "One dinner in Greece, billed to your brand. Big card. People will screenshot it.",
-    kind: "sponsor",
-    requiresProduct: true,
-    limit: 8,
-    placement: "Dinner sponsor block + product",
-  },
-  {
-    id: "official",
-    dollars: 499,
-    label: "Official Vacation Sponsor",
-    punch: "Your product in the hero strip. The only ad that might save a relationship.",
-    kind: "sponsor",
-    requiresProduct: true,
-    limit: 5,
-    placement: "Hero strip + official badge + product",
-  },
-  {
-    id: "naming",
-    dollars: 2500,
-    label: "The trip exists because of you",
-    punch: "One slot. Your name on the headline. This is how we actually hit €10,000.",
-    kind: "sponsor",
-    requiresProduct: true,
-    limit: 1,
-    placement: "Headline naming rights + hero product",
+    placement: "Brand wall",
   },
 ];
+
+export const LADDER = TIERS.filter((t) => t.id !== "wall");
 
 export const TIER_BY_ID = Object.fromEntries(TIERS.map((t) => [t.id, t])) as Record<TierId, Tier>;
 
@@ -194,7 +174,7 @@ export const LOGO_BY_HOST: Record<string, string> = Object.fromEntries(
 
 export const MIN_BID_CENTS = 100;
 export const MAX_BID_CENTS = 1_000_000;
-export const QUICK_BIDS = [1, 2, 5, 10, 25, 50, 100, 250, 500, 1_000, 2_500, 10_000];
+export const QUICK_BIDS = [5, 29, 69, 149, 299, 999, 2499, 4999, 1, 10, 50, 100, 10_000];
 
 export type Contribution = {
   id: number;
@@ -232,7 +212,7 @@ export function claimCents(rankAmountCents: number | undefined): number {
 
 export function tierForAmount(cents: number): TierId {
   const sorted = [...TIERS].sort((a, b) => b.dollars - a.dollars);
-  return sorted.find((t) => cents >= t.dollars * 100)?.id ?? "coffee";
+  return sorted.find((t) => cents >= t.dollars * 100)?.id ?? "moral";
 }
 
 export function timeAgo(iso: string): string {

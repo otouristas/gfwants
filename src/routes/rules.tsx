@@ -26,7 +26,8 @@ function RulesPage() {
 
         <Section title="How the board works">
           <li>This is not a charity and not tax-deductible. You are buying a screenshot and a link.</li>
-          <li>Bid any amount from €1 to €10,000. Custom amounts are the point.</li>
+          <li>Bid any amount from €1 to €10,000. Custom amounts are the point. Or buy a slot on the ladder.</li>
+          <li>€4,999 naming rights + two €2,499 savers = €9,997. Then one €5 hero and the crisis is technically over.</li>
           <li>To take a rank you must pay at least €1 more than the listing sitting there.</li>
           <li>Equal amounts keep the older listing higher. Matching does not steal the rank.</li>
           <li>When the charge succeeds, you show up on the homepage. Order is highest bid first.</li>

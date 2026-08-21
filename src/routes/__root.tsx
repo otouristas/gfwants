@@ -15,7 +15,7 @@ export const Route = createRootRoute({
       {
         name: "description",
         content:
-          "I promised a vacation. Then I spent the money on AI. Fund the trip, put your product on the wall, save a relationship.",
+          "I promised a vacation. Then I spent the money on AI. Bid €1 to €10,000. Put your product on the wall. Highest payer is #1.",
       },
       { name: "theme-color", content: "#f3efe8" },
     ],

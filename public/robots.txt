@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://mygirlfriendisfurious.lol/sitemap.xml

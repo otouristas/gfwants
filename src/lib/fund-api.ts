@@ -125,6 +125,8 @@ const memory: MemoryStore = ((globalThis as typeof globalThis & { __gfwantsMem?:
   nextId: 100,
 });
 
+let supabaseDown = false;
+
 function seedMemory() {
   if (memory.contributions.length > 0) return;
   memory.contributions = PAID_SEED.map((row, i) => ({
@@ -143,6 +145,7 @@ function seedMemory() {
 }
 
 async function readSupabase(): Promise<Contribution[] | null> {
+  if (supabaseDown) return null;
   const { data, error } = await supabase()
     .from("contributions")
     .select(
@@ -150,7 +153,11 @@ async function readSupabase(): Promise<Contribution[] | null> {
     )
     .order("amount_cents", { ascending: false })
     .order("created_at", { ascending: true });
-  if (error) return null;
+  if (error) {
+    const msg = `${error.code ?? ""} ${error.message ?? ""}`;
+    if (msg.includes("PGRST205") || msg.includes("schema cache")) supabaseDown = true;
+    return null;
+  }
   return (data ?? []).map((row) => mapSupabase(row as SupabaseContribution));
 }
 
@@ -158,6 +165,7 @@ async function insertSupabase(
   listing: ReturnType<typeof listingFromDraft>,
   stripeSessionId: string | null,
 ): Promise<Contribution | null> {
+  if (supabaseDown) return null;
   const { data, error } = await supabase()
     .from("contributions")
     .insert({
@@ -170,12 +178,18 @@ async function insertSupabase(
       product_url: listing.productUrl,
       product_pitch: listing.productPitch,
       stripe_session_id: stripeSessionId,
+      approved: true,
+      click_count: 0,
     })
     .select(
       "id, amount_cents, tier, display_name, x_handle, message, product_name, product_url, product_pitch, stripe_session_id, created_at",
     )
     .single();
-  if (error || !data) return null;
+  if (error || !data) {
+    const msg = `${error?.code ?? ""} ${error?.message ?? ""}`;
+    if (msg.includes("PGRST205") || msg.includes("schema cache")) supabaseDown = true;
+    return null;
+  }
   return mapSupabase(data as SupabaseContribution);
 }
 
@@ -323,17 +337,15 @@ export const getFund = createServerFn({ method: "GET" }).handler(async (): Promi
 
 const contributeSchema = z.object({
   tier: z.enum([
-    "coffee",
-    "api",
-    "cocktail",
-    "doghouse",
-    "ryanair",
-    "honeymoon",
-    "wall",
-    "funded",
-    "dinner",
-    "official",
+    "moral",
+    "link",
+    "nice",
+    "featured",
+    "datenight",
+    "partner",
+    "saver",
     "naming",
+    "wall",
   ]),
   amountCents: z.number().int().min(MIN_BID_CENTS).max(MAX_BID_CENTS),
   displayName: z.string().trim().max(32),
@@ -379,6 +391,11 @@ async function insertListing(
   stripeSessionId: string | null,
 ): Promise<{ contribution: Contribution; raisedCents: number }> {
   await ensureSeed();
+  if (listing.tier.limit != null) {
+    const current = await loadContributions();
+    const left = remainingFrom(current)[listing.tier.id] ?? 0;
+    if (left <= 0) throw new Error(`${listing.tier.label} is sold out. That is the point.`);
+  }
 
   const remote = await insertSupabase(listing, stripeSessionId);
   if (remote) {
@@ -504,7 +521,7 @@ export async function fulfillStripeSession(input: {
 
   if (!draft) {
     draft = {
-      tier: "honeymoon",
+      tier: "moral",
       amountCents: input.amountCents && input.amountCents >= MIN_BID_CENTS ? input.amountCents : 10_000,
       displayName: input.customerName || "Anonymous",
       xHandle: "",

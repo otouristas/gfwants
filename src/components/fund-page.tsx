@@ -7,6 +7,7 @@ import {
   FEATURED_BRANDS,
   LEAVE_AT,
   OWNER_HANDLE,
+  LADDER,
   SPEND_BARS,
   UNFINISHED_PROJECTS,
   UNLOCKS,
@@ -19,6 +20,7 @@ import {
   timeAgo,
   type Contribution,
   type FundPayload,
+  type Tier,
 } from "@/lib/fund";
 import { registerClick } from "@/lib/fund-api";
 import { cn } from "@/lib/utils";
@@ -194,6 +196,72 @@ export function HostageWall({ paid }: { paid: Contribution[] }) {
               <p className="mt-3 text-sm text-muted">{brand.pitch}</p>
               <p className="mt-3 font-mono text-sm tabular">{formatMoney(brand.euros * 100)}</p>
             </a>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export function CrisisMath() {
+  return (
+    <section className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <div className="rounded-xl bg-fg px-5 py-6 text-bg sm:px-8">
+        <p className="font-mono text-sm tabular text-bg/70">The arithmetic of a rescued relationship</p>
+        <p className="mt-2 font-display text-2xl tracking-tight sm:text-3xl">
+          €4,999 + €2,499 + €2,499 = €9,997
+        </p>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-bg/80">
+          Vacation Naming Rights plus two Relationship Savers. Then one €5 hero and the vacation
+          crisis is technically over. I will still buy Max if it overshoots.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+export function SponsorLadder({
+  remaining,
+  onPick,
+}: {
+  remaining: FundPayload["remaining"];
+  onPick: (tier: Tier) => void;
+}) {
+  return (
+    <section id="sponsor" className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <h2 className="text-3xl font-medium tracking-tight">This is not a donation page. This is ad inventory.</h2>
+      <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted">
+        I promised my girlfriend a vacation. Then I discovered AI subscriptions. So I turned the
+        crisis into sponsored slots. Put your website, SaaS, app, agency, newsletter, shop, or X
+        account on the apology. Bid custom if you want. Rank is cash.
+      </p>
+      <div className="mt-6 grid gap-3">
+        {LADDER.map((tier) => {
+          const left = remaining[tier.id];
+          const sold = left === 0;
+          return (
+            <article
+              key={tier.id}
+              className="flex flex-col gap-3 rounded-xl bg-elevated p-4 shadow-[var(--shadow-border)] sm:flex-row sm:items-center sm:gap-6 sm:p-5"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-medium">{tier.label}</h3>
+                  {tier.limit != null ? (
+                    <Badge variant={sold ? "mute" : "outline"}>{sold ? "Sold out" : `${left} left`}</Badge>
+                  ) : (
+                    <Badge variant="mute">Open</Badge>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-muted">{tier.punch}</p>
+              </div>
+              <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
+                <p className="font-mono text-xl tabular">{formatMoney(tier.dollars * 100)}</p>
+                <Button size="sm" disabled={sold} onClick={() => onPick(tier)}>
+                  {sold ? "Gone" : "Claim"}
+                </Button>
+              </div>
+            </article>
           );
         })}
       </div>
@@ -420,6 +488,14 @@ export function SiteFooter() {
         {" · "}
         <Link to="/rules" className="text-accent hover:text-fg">
           Rules
+        </Link>
+        {" · "}
+        <Link to="/terms" className="text-accent hover:text-fg">
+          Terms
+        </Link>
+        {" · "}
+        <Link to="/privacy" className="text-accent hover:text-fg">
+          Privacy
         </Link>
         {" · "}
         Built in a sitting because I apparently have not learned my lesson.

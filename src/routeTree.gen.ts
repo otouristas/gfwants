@@ -11,7 +11,9 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RulesRouteImport } from './routes/rules'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -24,9 +26,19 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RulesRoute = RulesRouteImport.update({
   id: '/rules',
   path: '/rules',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
@@ -38,34 +50,50 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/privacy': typeof PrivacyRoute
   '/rules': typeof RulesRoute
+  '/terms': typeof TermsRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/privacy': typeof PrivacyRoute
   '/rules': typeof RulesRoute
+  '/terms': typeof TermsRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/privacy': typeof PrivacyRoute
   '/rules': typeof RulesRoute
+  '/terms': typeof TermsRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/rules' | '/api/stripe/webhook'
+  fullPaths:
+    '/' | '/about' | '/privacy' | '/rules' | '/terms' | '/api/stripe/webhook'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/rules' | '/api/stripe/webhook'
-  id: '__root__' | '/' | '/about' | '/rules' | '/api/stripe/webhook'
+  to: '/' | '/about' | '/privacy' | '/rules' | '/terms' | '/api/stripe/webhook'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/privacy'
+    | '/rules'
+    | '/terms'
+    | '/api/stripe/webhook'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  PrivacyRoute: typeof PrivacyRoute
   RulesRoute: typeof RulesRoute
+  TermsRoute: typeof TermsRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
@@ -85,11 +113,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/rules': {
       id: '/rules'
       path: '/rules'
       fullPath: '/rules'
       preLoaderRoute: typeof RulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/stripe/webhook': {
@@ -105,7 +147,9 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  PrivacyRoute: PrivacyRoute,
   RulesRoute: RulesRoute,
+  TermsRoute: TermsRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ContributeDialog, type ContributeDraft } from "@/components/contribute-dialog";
-import { Hero, HostageWall, Leaderboard, Meters, MoneyMade, SiteFooter, SpendChart } from "@/components/fund-page";
+import { CrisisMath, Hero, HostageWall, Leaderboard, Meters, MoneyMade, SiteFooter, SpendChart, SponsorLadder } from "@/components/fund-page";
 import { SiteChrome } from "@/components/site-chrome";
-import { claimCents, tierForAmount } from "@/lib/fund";
+import { claimCents, tierForAmount, type Tier } from "@/lib/fund";
 import { getFund, pingVisitor } from "@/lib/fund-api";
 
 export const Route = createFileRoute("/")({
@@ -30,7 +30,7 @@ function Home() {
     queryKey: ["fund"],
     queryFn: () => getFund(),
     initialData: initial,
-    refetchInterval: 2500,
+    refetchInterval: 8000,
     refetchOnWindowFocus: true,
   });
   const fund = query.data ?? initial;
@@ -60,6 +60,15 @@ function Home() {
     setOpen(true);
   }
 
+  function pickTier(tier: Tier) {
+    setClaimRank(undefined);
+    setDraft({
+      ...emptyDraft(tier.dollars * 100),
+      tier: tier.id,
+    });
+    setOpen(true);
+  }
+
   function openDefault() {
     openBid(1, claimCents(fund.contributions[0]?.amountCents));
   }
@@ -70,6 +79,8 @@ function Home() {
       <Hero fund={fund} naming={fund.contributions.find((c) => c.tier === "naming")} onBid={openDefault} />
       <Meters fund={fund} />
       <HostageWall paid={fund.contributions} />
+      <CrisisMath />
+      <SponsorLadder remaining={fund.remaining} onPick={pickTier} />
       <Leaderboard
         items={fund.contributions}
         onClaim={openBid}
