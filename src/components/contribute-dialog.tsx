@@ -12,14 +12,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { contribute, createCheckout } from "@/lib/fund-api";
+import { createCheckout } from "@/lib/fund-api";
 import { trackBeginCheckout } from "@/lib/gtag";
 import {
   MAX_BID_CENTS,
   MIN_BID_CENTS,
   QUICK_BIDS,
-  WISE_QR,
-  WISE_TAG,
   formatMoney,
   type TierId,
 } from "@/lib/fund";
@@ -96,24 +94,6 @@ export function ContributeDialog({
     } catch (err) {
       setBusy(false);
       toast.error(err instanceof Error ? err.message : "Card checkout failed");
-    }
-  }
-
-  async function paidOnWise() {
-    if (!agreed) {
-      toast.error("Agree to the rules first. They are short.");
-      return;
-    }
-    setBusy(true);
-    try {
-      await contribute({ data: payload() });
-      onSettled();
-      onOpenChange(false);
-      toast.success("You are on the board. I will check Wise.");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not add you");
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -236,28 +216,13 @@ export function ContributeDialog({
               <LoaderCircle className="size-4 animate-spin" />
               Opening card checkout
             </>
-          ) : euros === 100 ? (
-            "Pay €100 with card"
           ) : (
-            `Pay ${formatMoney(draft.amountCents)} — card, then you hit the board`
+            `Pay ${formatMoney(draft.amountCents)} with card`
           )}
         </Button>
         <p className="text-center text-xs text-faint">
-          {euros === 100
-            ? "Visa, Mastercard, Apple Pay. You land on the board when the charge succeeds."
-            : "Card checkout is live. For a custom number that is not €100, Wise is exact."}
+          Visa, Mastercard, Apple Pay. You land on the board when the charge succeeds.
         </p>
-
-        <div className="grid gap-3 rounded-lg bg-subtle p-3">
-          <p className="text-sm font-medium">Faster: send {formatMoney(draft.amountCents)} on Wise</p>
-          <p className="text-xs text-muted">
-            @{WISE_TAG}. Any amount. Then tap the button so you show up on the homepage.
-          </p>
-          <img src={WISE_QR} alt={`Wise @${WISE_TAG}`} className="mx-auto w-40 rounded-md" />
-          <Button variant="outline" disabled={busy} onClick={() => void paidOnWise()}>
-            I sent {formatMoney(draft.amountCents)} on Wise — put me on the board
-          </Button>
-        </div>
       </DialogContent>
     </Dialog>
   );

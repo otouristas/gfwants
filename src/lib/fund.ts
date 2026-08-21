@@ -1,7 +1,5 @@
 export const GOAL_CENTS = 1_000_000;
 export const OWNER_HANDLE = "touristasai";
-export const WISE_TAG = "georgek992";
-export const WISE_QR = "/wise-qr.png";
 export const UNFINISHED_PROJECTS = 1454;
 export const LEAVE_AT = Date.UTC(2026, 7, 24, 5, 0, 0); // Monday 08:00 EEST
 

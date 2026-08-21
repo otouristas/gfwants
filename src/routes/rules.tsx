@@ -31,7 +31,7 @@ function RulesPage() {
           <li>To take a rank you must pay at least €1 more than the listing sitting there.</li>
           <li>Equal amounts keep the older listing higher. Matching does not steal the rank.</li>
           <li>When the charge succeeds, you show up on the homepage. Order is highest bid first.</li>
-          <li>Card is Stripe. Wise is faster for any custom amount.</li>
+          <li>Card is Stripe. The amount you pick is the amount you pay.</li>
         </Section>
 
         <Section title="What you can put on the board">
