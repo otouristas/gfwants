@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteChrome } from "@/components/site-chrome";
 import { formatMoney } from "@/lib/fund";
 import { completeCheckout, getFund } from "@/lib/fund-api";
+import { trackPurchase } from "@/lib/gtag";
 
 type Search = { session_id?: string; pending?: string };
 
@@ -30,6 +32,15 @@ export const Route = createFileRoute("/thanks")({
 
 function ThanksPage() {
   const { fund, paid } = Route.useLoaderData();
+  const search = Route.useSearch();
+  useEffect(() => {
+    if (!paid || !search.session_id) return;
+    trackPurchase({
+      transactionId: search.session_id,
+      amountCents: paid.amountCents,
+      name: paid.displayName,
+    });
+  }, [paid, search.session_id]);
   return (
     <div className="min-h-dvh bg-bg text-fg">
       <SiteChrome raisedCents={fund.raisedCents} />

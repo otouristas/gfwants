@@ -6,6 +6,7 @@ import { CrisisMath, Hero, HostageWall, Leaderboard, Meters, MoneyMade, SiteFoot
 import { SiteChrome } from "@/components/site-chrome";
 import { claimCents, tierForAmount, type Tier } from "@/lib/fund";
 import { getFund, pingVisitor } from "@/lib/fund-api";
+import { trackSelectItem, trackViewItemList } from "@/lib/gtag";
 
 export const Route = createFileRoute("/")({
   loader: () => getFund(),
@@ -54,10 +55,16 @@ function Home() {
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    trackViewItemList();
+  }, []);
+
   function openBid(rank: number, amountCents: number) {
     setClaimRank(rank);
-    setDraft(emptyDraft(amountCents));
+    const next = emptyDraft(amountCents);
+    setDraft(next);
     setOpen(true);
+    trackSelectItem(next.tier, amountCents);
   }
 
   function pickTier(tier: Tier) {
@@ -67,6 +74,7 @@ function Home() {
       tier: tier.id,
     });
     setOpen(true);
+    trackSelectItem(tier.id, tier.dollars * 100);
   }
 
   function openDefault() {

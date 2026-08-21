@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { contribute, createCheckout } from "@/lib/fund-api";
+import { trackBeginCheckout } from "@/lib/gtag";
 import {
   MAX_BID_CENTS,
   MIN_BID_CENTS,
@@ -89,6 +90,7 @@ export function ContributeDialog({
     }
     setBusy(true);
     try {
+      trackBeginCheckout(draft.tier, draft.amountCents);
       const checkout = await createCheckout({ data: payload() });
       window.location.assign(checkout.url);
     } catch (err) {
