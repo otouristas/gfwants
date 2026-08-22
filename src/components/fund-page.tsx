@@ -29,22 +29,22 @@ export function Hero({
   fund,
   naming,
   onBid,
+  onCheap,
 }: {
   fund: FundPayload;
   naming?: Contribution;
   onBid: () => void;
+  onCheap: () => void;
 }) {
+  const take = claimCents(fund.contributions[0]?.amountCents);
   return (
-    <header className="mx-auto max-w-5xl px-4 pt-10 pb-6 sm:px-6 sm:pt-16">
+    <header className="mx-auto max-w-5xl px-4 pt-8 pb-4 sm:px-6 sm:pt-14 sm:pb-8">
       <LiveVisitors live={fund.liveVisitors} total={fund.visitorsSinceLaunch} />
-      <p className="mt-5 text-xs tracking-[0.18em] text-muted uppercase">
-        A personal financial disaster with a departure time
-      </p>
-      <h1 className="mt-4 max-w-3xl text-4xl leading-[1.08] font-medium tracking-tight sm:text-6xl">
-        I promised my girlfriend a vacation. Then I discovered Claude, ChatGPT, Cursor, and 1,454 unfinished projects.
+      <h1 className="mt-5 max-w-2xl text-[2rem] leading-[1.08] font-medium tracking-tight sm:text-5xl">
+        I promised a vacation. Then I spent it on AI.
       </h1>
       {naming?.productName ? (
-        <p className="mt-4 text-sm text-accent">
+        <p className="mt-3 text-sm text-accent">
           This trip exists because of{" "}
           {naming.productUrl ? (
             <a
@@ -62,19 +62,17 @@ export function Hero({
         </p>
       ) : null}
       <MondayClock />
-      <p className="mt-6 max-w-xl text-base leading-relaxed text-muted">
-        The trip exists. We leave Monday. Flights: booked. Hotel: booked. Vacation fund: currently an
-        apology with a progress bar. Claude needed Max. ChatGPT needed Plus. Cursor needed Pro. I
-        bought this domain with what was left. She is still coming. She is still furious.
+      <p className="mt-4 max-w-lg text-base leading-relaxed text-muted">
+        We leave Monday. Your website on this homepage. Highest payer is #1.
       </p>
-      <p className="mt-4 max-w-xl text-base leading-relaxed text-muted">
-        If this overshoots, I will buy more AI Max and finish the pile. That is not a threat. That is
-        the business model. Bid €1 or €10,000. Highest payer is #1. Your website goes on this
-        homepage. We leave Monday.
-      </p>
-      <Button className="mt-6 h-11 px-6" onClick={onBid}>
-        Claim #1 for {formatMoney(claimCents(fund.contributions[0]?.amountCents))}
-      </Button>
+      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button className="h-12 w-full px-6 sm:w-auto" onClick={onBid}>
+          Bid {formatMoney(take)} — take #1
+        </Button>
+        <Button variant="outline" className="h-12 w-full px-6 sm:w-auto" onClick={onCheap}>
+          €5 — just get on the board
+        </Button>
+      </div>
     </header>
   );
 }
@@ -105,7 +103,7 @@ function MondayClock() {
   const mins = Math.floor((left % 3_600_000) / 60_000);
   const gone = left <= 0;
   return (
-    <p className="mt-6 font-mono text-sm tabular text-accent">
+    <p className="mt-4 font-mono text-sm tabular text-accent">
       {gone
         ? "We are supposed to be gone. Keep bidding. I will buy Max from the boat."
         : `Boarding in ${days}d ${hours}h ${mins}m · Monday morning · she has seen the tickets`}
@@ -257,7 +255,7 @@ export function SponsorLadder({
               </div>
               <div className="flex items-center justify-between gap-3 sm:flex-col sm:items-end">
                 <p className="font-mono text-xl tabular">{formatMoney(tier.dollars * 100)}</p>
-                <Button size="sm" disabled={sold} onClick={() => onPick(tier)}>
+                <Button size="sm" className="min-w-24" disabled={sold} onClick={() => onPick(tier)}>
                   {sold ? "Gone" : "Claim"}
                 </Button>
               </div>
@@ -291,6 +289,16 @@ export function SpendChart() {
   );
 }
 
+export function StickyBid({ amountCents, onBid }: { amountCents: number; onBid: () => void }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md md:hidden">
+      <Button className="h-12 w-full" onClick={onBid}>
+        Bid {formatMoney(amountCents)} — take #1
+      </Button>
+    </div>
+  );
+}
+
 export function Leaderboard({
   items,
   onClaim,
@@ -309,8 +317,7 @@ export function Leaderboard({
     <section id="board" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
       <h2 className="text-3xl font-medium tracking-tight">Hall of Relationship Saviors</h2>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        Ranked by cash. Hover a row and steal it for €1 more. Your website, your pitch, your logo.
-        A completed payment is what claims the rank.
+        Ranked by cash. Tap a row to steal it for €1 more. Your website stays on the homepage.
       </p>
       <div className="mt-6 overflow-hidden rounded-xl bg-elevated shadow-[var(--shadow-border)]">
         {slice.length === 0 ? (
@@ -323,11 +330,11 @@ export function Leaderboard({
             const take = claimCents(item.amountCents);
             return (
               <div key={item.id} className="group relative border-t border-border first:border-t-0">
-                <RankRow item={item} rank={rank} />
+                <RankRow item={item} rank={rank} onClaim={() => onClaim(rank, take)} take={take} />
                 <button
                   type="button"
                   onClick={() => onClaim(rank, take)}
-                  className="pointer-events-none absolute top-1.5 left-1/2 z-20 -translate-x-1/2 rounded-full bg-fg px-2.5 py-0.5 text-xs font-bold whitespace-nowrap text-bg opacity-0 shadow-sm transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+                  className="pointer-events-none absolute top-1.5 left-1/2 z-20 hidden -translate-x-1/2 rounded-full bg-fg px-2.5 py-0.5 text-xs font-bold whitespace-nowrap text-bg opacity-0 shadow-sm transition-opacity duration-150 md:block group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100"
                 >
                   claim this rank for {formatMoney(take)}
                 </button>
@@ -368,7 +375,17 @@ export function Leaderboard({
   );
 }
 
-function RankRow({ item, rank }: { item: Contribution; rank: number }) {
+function RankRow({
+  item,
+  rank,
+  onClaim,
+  take,
+}: {
+  item: Contribution;
+  rank: number;
+  onClaim: () => void;
+  take: number;
+}) {
   const host = item.productUrl ? hostFromUrl(item.productUrl) : null;
   const title = host ?? item.productName ?? item.displayName;
   const pitch = item.productPitch || item.message;
@@ -424,6 +441,17 @@ function RankRow({ item, rank }: { item: Contribution; rank: number }) {
           ) : null}
         </p>
       </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onClaim();
+        }}
+        className="shrink-0 rounded-full bg-fg px-2.5 py-1 text-[11px] font-semibold whitespace-nowrap text-bg md:hidden"
+      >
+        Outbid {formatMoney(take)}
+      </button>
     </>
   );
 

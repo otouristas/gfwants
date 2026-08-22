@@ -10,16 +10,20 @@ export function SiteChrome({
   onContribute?: () => void;
 }) {
   return (
-    <header className="w-full">
-      <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 pt-5 pb-4">
-        <Link to="/" className="inline-flex items-center gap-1.5 font-display text-[22px] tracking-tight">
-          mygirlfriendisfurious
+    <header className="sticky top-0 z-40 w-full bg-bg/90 backdrop-blur-md">
+      <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4 sm:h-16 sm:px-6">
+        <Link
+          to="/"
+          className="min-w-0 truncate font-display text-[17px] tracking-tight sm:text-[22px]"
+        >
+          <span className="hidden sm:inline">mygirlfriendis</span>
+          furious
           <span className="text-accent">.</span>
           <span className="text-muted">lol</span>
         </Link>
-        <div className="flex items-center gap-3 sm:gap-4">
-          <nav aria-label="Main">
-            <ul className="flex items-center gap-4 text-sm sm:gap-5">
+        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-4">
+          <nav aria-label="Main" className="hidden md:block">
+            <ul className="flex items-center gap-5 text-sm">
               <li>
                 <NavLink to="/">Leaderboard</NavLink>
               </li>
@@ -32,14 +36,16 @@ export function SiteChrome({
             </ul>
           </nav>
           {raisedCents != null ? (
-            <p className="hidden font-mono text-sm tabular text-muted sm:block">{formatMoney(raisedCents)}</p>
+            <p className="hidden font-mono text-sm tabular text-muted lg:block">
+              {formatMoney(raisedCents)}
+            </p>
           ) : null}
           {onContribute ? (
-            <Button size="sm" onClick={onContribute}>
+            <Button size="sm" className="shrink-0 px-4" onClick={onContribute}>
               Bid
             </Button>
           ) : (
-            <Button size="sm" asChild>
+            <Button size="sm" className="shrink-0 px-4" asChild>
               <Link to="/">Bid</Link>
             </Button>
           )}

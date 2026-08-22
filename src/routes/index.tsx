@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { ContributeDialog, type ContributeDraft } from "@/components/contribute-dialog";
-import { CrisisMath, Hero, HostageWall, Leaderboard, Meters, MoneyMade, SiteFooter, SpendChart, SponsorLadder } from "@/components/fund-page";
+import { CrisisMath, Hero, HostageWall, Leaderboard, Meters, MoneyMade, SiteFooter, SpendChart, SponsorLadder, StickyBid } from "@/components/fund-page";
 import { SiteChrome } from "@/components/site-chrome";
 import { claimCents, tierForAmount, type Tier } from "@/lib/fund";
 import { getFund, pingVisitor } from "@/lib/fund-api";
@@ -81,10 +81,25 @@ function Home() {
     openBid(1, claimCents(fund.contributions[0]?.amountCents));
   }
 
+  function openCheap() {
+    setClaimRank(undefined);
+    const next = emptyDraft(500);
+    setDraft(next);
+    setOpen(true);
+    trackSelectItem(next.tier, 500);
+  }
+
+  const takeOne = claimCents(fund.contributions[0]?.amountCents);
+
   return (
-    <div className="flex min-h-dvh flex-col bg-bg text-fg">
+    <div className="flex min-h-dvh flex-col bg-bg pb-20 text-fg md:pb-0">
       <SiteChrome raisedCents={fund.raisedCents} onContribute={openDefault} />
-      <Hero fund={fund} naming={fund.contributions.find((c) => c.tier === "naming")} onBid={openDefault} />
+      <Hero
+        fund={fund}
+        naming={fund.contributions.find((c) => c.tier === "naming")}
+        onBid={openDefault}
+        onCheap={openCheap}
+      />
       <Meters fund={fund} />
       <HostageWall paid={fund.contributions} />
       <CrisisMath />
@@ -97,6 +112,7 @@ function Home() {
       <SpendChart />
       <MoneyMade raisedCents={fund.raisedCents} />
       <SiteFooter />
+      {open ? null : <StickyBid amountCents={takeOne} onBid={openDefault} />}
       <ContributeDialog
         open={open}
         onOpenChange={setOpen}
