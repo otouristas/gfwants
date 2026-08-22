@@ -184,6 +184,7 @@ export type Contribution = {
   productName: string | null;
   productUrl: string | null;
   productPitch: string | null;
+  logoUrl?: string | null;
   clickCount: number;
   createdAt: string;
 };
@@ -364,10 +365,34 @@ export function hostFromUrl(url: string): string {
 }
 
 export function logoForUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const host = hostFromUrl(url);
-  if (LOGO_BY_HOST[host]) return LOGO_BY_HOST[host];
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=128`;
+  return faviconCandidates(url)[0] ?? null;
+}
+
+export function faviconCandidates(url: string | null | undefined, scraped?: string | null): string[] {
+  if (!url?.trim() && !scraped) return [];
+  const out: string[] = [];
+  if (scraped) out.push(scraped);
+  let host = "";
+  let origin = "";
+  if (url?.trim()) {
+    try {
+      const parsed = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+      host = parsed.hostname.replace(/^www\./, "").toLowerCase();
+      origin = `${parsed.protocol}//${parsed.hostname}`;
+    } catch {
+      host = "";
+    }
+  }
+  if (host && LOGO_BY_HOST[host]) out.push(LOGO_BY_HOST[host]);
+  if (host) {
+    out.push(`https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`);
+    out.push(`https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(host)}`);
+  }
+  if (origin) {
+    out.push(`${origin}/apple-touch-icon.png`);
+    out.push(`${origin}/favicon.ico`);
+  }
+  return [...new Set(out)];
 }
 
 export function shareText(amountCents: number, score: number): string {

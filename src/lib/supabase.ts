@@ -27,6 +27,7 @@ export type SupabaseContribution = {
   product_name: string | null;
   product_url: string | null;
   product_pitch: string | null;
+  logo_url?: string | null;
   stripe_session_id: string | null;
   click_count?: number | null;
   created_at: string;

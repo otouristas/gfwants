@@ -16,7 +16,7 @@ import {
   claimCents,
   formatMoney,
   hostFromUrl,
-  logoForUrl,
+  faviconCandidates,
   timeAgo,
   type Contribution,
   type FundPayload,
@@ -412,7 +412,7 @@ function RankRow({
         >
           #{rank}
         </span>
-        <BrandMark url={item.productUrl} name={title} />
+        <BrandMark url={item.productUrl} name={title} logoUrl={item.logoUrl} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
@@ -532,23 +532,38 @@ export function SiteFooter() {
   );
 }
 
-export function BrandMark({ url, name }: { url?: string | null; name: string }) {
-  const logo = logoForUrl(url ?? null) ?? FEATURED_BRANDS.find((b) => b.name === name)?.logo;
-  if (logo) {
+export function BrandMark({
+  url,
+  name,
+  logoUrl,
+}: {
+  url?: string | null;
+  name: string;
+  logoUrl?: string | null;
+}) {
+  const sources = faviconCandidates(url ?? null, logoUrl);
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    setI(0);
+  }, [url, logoUrl]);
+  const src = sources[i];
+  if (!src) {
+    const letter = (name || "?").slice(0, 1).toUpperCase();
     return (
-      <img
-        src={logo}
-        alt=""
-        width={56}
-        height={56}
-        className="size-10 rounded-md bg-subtle object-contain md:size-14"
-      />
+      <div className="grid size-10 shrink-0 place-items-center rounded-md bg-subtle text-sm font-medium md:size-14">
+        {letter}
+      </div>
     );
   }
-  const letter = (name || "?").slice(0, 1).toUpperCase();
   return (
-    <div className="grid size-10 shrink-0 place-items-center rounded-md bg-subtle text-sm font-medium md:size-14">
-      {letter}
-    </div>
+    <img
+      src={src}
+      alt=""
+      width={56}
+      height={56}
+      referrerPolicy="no-referrer"
+      onError={() => setI((n) => n + 1)}
+      className="size-10 shrink-0 rounded-md bg-subtle object-contain md:size-14"
+    />
   );
 }

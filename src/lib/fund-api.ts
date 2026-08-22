@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { getSql, type Sql } from "@/lib/db";
 import { supabase, type SupabaseContribution } from "@/lib/supabase";
+import { scrapeFavicon } from "@/lib/favicon";
 import {
   FEATURED_BRANDS,
   GOAL_CENTS,
@@ -28,6 +29,7 @@ type Row = {
   product_name: string | null;
   product_url: string | null;
   product_pitch: string | null;
+  logo_url?: string | null;
   click_count?: number | null;
   created_at: Date | string;
 };
@@ -78,6 +80,7 @@ function mapRow(row: Row): Contribution {
     productName: row.product_name,
     productUrl: row.product_url,
     productPitch: row.product_pitch,
+    logoUrl: row.logo_url ?? null,
     clickCount: Number(row.click_count ?? 0),
     createdAt: iso(row.created_at),
   };
@@ -94,6 +97,7 @@ function mapSupabase(row: SupabaseContribution): Contribution {
     product_name: row.product_name,
     product_url: row.product_url,
     product_pitch: row.product_pitch,
+    logo_url: row.logo_url,
     click_count: row.click_count,
     created_at: row.created_at,
   });
@@ -216,6 +220,7 @@ async function ensureSeed() {
   `;
   await sql`alter table contributions add column if not exists stripe_session_id text`;
   await sql`alter table contributions add column if not exists click_count integer not null default 0`;
+  await sql`alter table contributions add column if not exists logo_url text`;
   await sql`
     create table if not exists pending_payments (
       id text primary key,
@@ -382,6 +387,7 @@ function listingFromDraft(data: ContributeInput) {
     productName,
     productUrl,
     productPitch,
+    logoUrl: null as string | null,
   };
 }
 
@@ -394,6 +400,9 @@ async function insertListing(
     const current = await loadContributions();
     const left = remainingFrom(current)[listing.tier.id] ?? 0;
     if (left <= 0) throw new Error(`${listing.tier.label} is sold out. That is the point.`);
+  }
+  if (listing.productUrl && !listing.logoUrl) {
+    listing.logoUrl = await scrapeFavicon(listing.productUrl);
   }
 
   const remote = await insertSupabase(listing, stripeSessionId);
@@ -414,6 +423,7 @@ async function insertListing(
       productName: listing.productName,
       productUrl: listing.productUrl,
       productPitch: listing.productPitch,
+      logoUrl: listing.logoUrl,
       clickCount: 0,
       createdAt: new Date().toISOString(),
     };
@@ -424,7 +434,7 @@ async function insertListing(
   const inserted = await sql<Row>`
     insert into contributions (
       amount_cents, tier, display_name, x_handle, message,
-      product_name, product_url, product_pitch, stripe_session_id
+      product_name, product_url, product_pitch, logo_url, stripe_session_id
     ) values (
       ${listing.amountCents},
       ${listing.tier.id},
@@ -434,10 +444,11 @@ async function insertListing(
       ${listing.productName},
       ${listing.productUrl},
       ${listing.productPitch},
+      ${listing.logoUrl},
       ${stripeSessionId}
     )
     returning id, amount_cents, tier, display_name, x_handle, message,
-              product_name, product_url, product_pitch, click_count, created_at
+              product_name, product_url, product_pitch, logo_url, click_count, created_at
   `;
   const contribution = mapRow(inserted[0]!);
   const all = await loadContributions();

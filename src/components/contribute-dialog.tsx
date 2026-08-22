@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createCheckout } from "@/lib/fund-api";
 import { trackBeginCheckout } from "@/lib/gtag";
+import { BrandMark } from "@/components/fund-page";
 import {
   MAX_BID_CENTS,
   MIN_BID_CENTS,
@@ -163,13 +164,17 @@ export function ContributeDialog({
         ) : null}
 
         <Field label="Website — this is how you get traffic">
-          <Input
-            value={draft.productUrl}
-            autoComplete="off"
-            inputMode="url"
-            placeholder="https://yoursite.com"
-            onChange={(e) => onDraftChange({ ...draft, productUrl: e.target.value })}
-          />
+          <div className="flex items-center gap-2">
+            <BrandMark url={draft.productUrl} name={draft.productName || draft.displayName || "?"} />
+            <Input
+              value={draft.productUrl}
+              autoComplete="off"
+              inputMode="url"
+              placeholder="https://yoursite.com"
+              onChange={(e) => onDraftChange({ ...draft, productUrl: e.target.value })}
+            />
+          </div>
+          <p className="text-xs text-faint">Favicon is pulled from that URL and lands on the homepage with you.</p>
         </Field>
         <Field label="One-line pitch">
           <Input
