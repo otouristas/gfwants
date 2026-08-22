@@ -11,17 +11,16 @@ export function SiteChrome({
 }) {
   return (
     <header className="sticky top-0 z-40 w-full bg-bg/90 backdrop-blur-md">
-      <div className="mx-auto flex h-14 w-full max-w-5xl items-center gap-3 px-4 sm:h-16 sm:px-6">
+      <div className="mx-auto flex h-12 w-full max-w-5xl items-center gap-2 px-3 sm:h-16 sm:gap-4 sm:px-6">
         <Link
           to="/"
-          className="min-w-0 truncate font-display text-[17px] tracking-tight sm:text-[22px]"
+          className="min-w-0 flex-1 whitespace-nowrap font-display text-[clamp(12.5px,3.4vw+2px,22px)] leading-none tracking-[-0.04em] sm:flex-none sm:tracking-tight"
         >
-          <span className="hidden sm:inline">mygirlfriendis</span>
-          furious
+          mygirlfriendisfurious
           <span className="text-accent">.</span>
           <span className="text-muted">lol</span>
         </Link>
-        <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-4">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-4">
           <nav aria-label="Main" className="hidden md:block">
             <ul className="flex items-center gap-5 text-sm">
               <li>
@@ -41,11 +40,11 @@ export function SiteChrome({
             </p>
           ) : null}
           {onContribute ? (
-            <Button size="sm" className="shrink-0 px-4" onClick={onContribute}>
+            <Button size="sm" className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-[13px]" onClick={onContribute}>
               Bid
             </Button>
           ) : (
-            <Button size="sm" className="shrink-0 px-4" asChild>
+            <Button size="sm" className="h-8 px-3 text-xs sm:h-9 sm:px-4 sm:text-[13px]" asChild>
               <Link to="/">Bid</Link>
             </Button>
           )}
