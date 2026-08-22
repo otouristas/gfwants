@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { RefreshCw, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,14 +15,16 @@ import {
   approvalStatus,
   claimCents,
   formatMoney,
+  goPath,
   hostFromUrl,
   faviconCandidates,
   timeAgo,
+  withUtm,
   type Contribution,
   type FundPayload,
   type Tier,
 } from "@/lib/fund";
-import { registerClick } from "@/lib/fund-api";
+import { trackOutboundClick } from "@/lib/gtag";
 import { cn } from "@/lib/utils";
 
 export function Hero({
@@ -48,9 +50,16 @@ export function Hero({
           This trip exists because of{" "}
           {naming.productUrl ? (
             <a
-              href={naming.productUrl}
+              href={goPath(naming.id)}
               target="_blank"
               rel="sponsored noopener noreferrer"
+              onClick={() =>
+                trackOutboundClick({
+                  url: naming.productUrl!,
+                  host: hostFromUrl(naming.productUrl!),
+                  id: naming.id,
+                })
+              }
               className="underline decoration-border-strong underline-offset-4"
             >
               {naming.productName}
@@ -167,12 +176,21 @@ export function HostageWall({ paid }: { paid: Contribution[] }) {
       <div className="mt-6 grid gap-3 md:grid-cols-3">
         {FEATURED_BRANDS.map((brand) => {
           const on = paidHosts.has(brand.host);
+          const match = paid.find((c) => c.productUrl && hostFromUrl(c.productUrl) === brand.host);
+          const href = match ? goPath(match.id) : withUtm(brand.url, brand.host);
           return (
             <a
               key={brand.id}
-              href={brand.url}
+              href={href}
               target="_blank"
               rel="sponsored noopener noreferrer"
+              onClick={() =>
+                trackOutboundClick({
+                  url: brand.url,
+                  host: brand.host,
+                  id: match?.id,
+                })
+              }
               className="rounded-xl bg-elevated p-4 shadow-[var(--shadow-border)] transition-[box-shadow] duration-150 hover:shadow-[var(--shadow-border-hover)]"
             >
               <div className="flex items-start gap-3">
@@ -390,17 +408,6 @@ function RankRow({
   const title = host ?? item.productName ?? item.displayName;
   const pitch = item.productPitch || item.message;
 
-  async function onClick(e: MouseEvent<HTMLAnchorElement>) {
-    if (!item.productUrl) return;
-    e.preventDefault();
-    try {
-      const result = await registerClick({ data: { id: item.id } });
-      window.open(result.url, "_blank", "noopener,noreferrer");
-    } catch {
-      window.open(item.productUrl, "_blank", "noopener,noreferrer");
-    }
-  }
-
   const inner = (
     <>
       <div className="flex w-10 shrink-0 flex-col items-center gap-1.5 md:w-auto md:flex-row md:gap-3">
@@ -458,8 +465,15 @@ function RankRow({
   if (item.productUrl) {
     return (
       <a
-        href={item.productUrl}
-        onClick={onClick}
+        href={goPath(item.id)}
+        onClick={() =>
+          trackOutboundClick({
+            url: item.productUrl!,
+            host: host ?? undefined,
+            id: item.id,
+            rank,
+          })
+        }
         target="_blank"
         rel="sponsored noopener noreferrer"
         className="flex h-full items-center gap-2 px-3 py-2 transition-colors hover:text-accent md:gap-3 md:px-4 md:py-3"
@@ -506,7 +520,7 @@ export function SiteFooter() {
       <p className="text-sm text-muted">
         Built by{" "}
         <a
-          href={`https://x.com/${OWNER_HANDLE}`}
+          href={withUtm(`https://x.com/${OWNER_HANDLE}`, "footer-x")}
           target="_blank"
           rel="noopener noreferrer"
           className="text-accent hover:text-fg"

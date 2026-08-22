@@ -7,7 +7,7 @@ import { GA_ID, trackPageView } from "@/lib/gtag";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "mygirlfriendisfurious.lol";
-const GA_SNIPPET = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}',{send_page_view:false});`;
+const GA_SNIPPET = `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${GA_ID}',{send_page_view:false,anonymize_ip:false});`;
 
 export const Route = createRootRoute({
   head: () => ({

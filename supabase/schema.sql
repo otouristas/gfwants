@@ -55,6 +55,19 @@ create policy pending_public_all
   using (true)
   with check (true);
 
+create table if not exists public.visitor_pings (
+  visitor_id text primary key,
+  seen_at timestamptz not null default now()
+);
+
+alter table public.visitor_pings enable row level security;
+
+drop policy if exists visitor_pings_public_all on public.visitor_pings;
+create policy visitor_pings_public_all
+  on public.visitor_pings for all
+  using (true)
+  with check (true);
+
 insert into public.contributions (
   amount_cents, tier, display_name, x_handle, message,
   product_name, product_url, product_pitch, approved

@@ -395,6 +395,29 @@ export function faviconCandidates(url: string | null | undefined, scraped?: stri
   return [...new Set(out)];
 }
 
+export const UTM_SOURCE = "mygirlfriendisfurious.lol";
+export const UTM_MEDIUM = "sponsor";
+export const UTM_CAMPAIGN = "relationship_recovery";
+
+export function withUtm(url: string, content?: string | number): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.searchParams.has("utm_source")) parsed.searchParams.set("utm_source", UTM_SOURCE);
+    if (!parsed.searchParams.has("utm_medium")) parsed.searchParams.set("utm_medium", UTM_MEDIUM);
+    if (!parsed.searchParams.has("utm_campaign")) parsed.searchParams.set("utm_campaign", UTM_CAMPAIGN);
+    if (content != null && !parsed.searchParams.has("utm_content")) {
+      parsed.searchParams.set("utm_content", String(content).slice(0, 80));
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
+export function goPath(id: number): string {
+  return `/go/${id}`;
+}
+
 export function shareText(amountCents: number, score: number): string {
   return `I just put ${formatMoney(amountCents)} toward a vacation that actually leaves Monday.\n\nGirlfriend Approval Index: ${score}/100\nIf this overshoots, George buys more AI Max and finishes 1,454 projects.\nmygirlfriendisfurious.lol`;
 }

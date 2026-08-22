@@ -13,6 +13,8 @@ import {
   isTierId,
   sanitizeHandle,
   sanitizeUrl,
+  withUtm,
+  hostFromUrl,
   tierForAmount,
   type Contribution,
   type FundPayload,
@@ -291,12 +293,14 @@ function payloadFrom(
 }
 
 async function visitorStats(): Promise<{ live: number; total: number }> {
+  const remote = await visitorStatsSupabase();
+  if (remote) return remote;
   const sql = await trySql();
   if (!sql) {
     const cutoff = Date.now() - 120_000;
     let live = 0;
     for (const ts of memory.visitors.values()) if (ts > cutoff) live += 1;
-    return { live: Math.max(1, live), total: Math.max(memory.visitorTotal, 1) };
+    return { live, total: memory.visitorTotal };
   }
   await sql`
     create table if not exists visitor_pings (
@@ -308,7 +312,28 @@ async function visitorStats(): Promise<{ live: number; total: number }> {
   const liveRows = await sql<{ n: number }>`select count(*)::int as n from visitor_pings`;
   const totalRows = await sql<{ v: string }>`select v from fund_meta where k = 'visitors'`;
   const total = Number(totalRows[0]?.v ?? 0);
-  return { live: Math.max(1, Number(liveRows[0]?.n ?? 0)), total: Math.max(total, 1) };
+  return { live: Number(liveRows[0]?.n ?? 0), total };
+}
+
+async function visitorStatsSupabase(): Promise<{ live: number; total: number } | null> {
+  if (supabaseDown) return null;
+  const cutoff = new Date(Date.now() - 120_000).toISOString();
+  const live = await supabase()
+    .from("visitor_pings")
+    .select("visitor_id", { count: "exact", head: true })
+    .gte("seen_at", cutoff);
+  if (live.error) return null;
+  const total = await supabase().from("visitor_pings").select("visitor_id", { count: "exact", head: true });
+  if (total.error) return null;
+  return { live: live.count ?? 0, total: total.count ?? 0 };
+}
+
+async function pingSupabase(visitorId: string): Promise<boolean> {
+  if (supabaseDown) return false;
+  const { error } = await supabase()
+    .from("visitor_pings")
+    .upsert({ visitor_id: visitorId, seen_at: new Date().toISOString() }, { onConflict: "visitor_id" });
+  return !error;
 }
 
 async function loadContributions(): Promise<Contribution[]> {
@@ -583,48 +608,78 @@ export const pingVisitor = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ visitorId: z.string().trim().min(8).max(64) }).parse(data))
   .handler(async ({ data }) => {
     await ensureSeed();
+    const firstMemory = !memory.visitors.has(data.visitorId);
+    memory.visitors.set(data.visitorId, Date.now());
+    if (firstMemory) memory.visitorTotal += 1;
+    await pingSupabase(data.visitorId);
     const sql = await trySql();
-    if (!sql) {
-      const first = !memory.visitors.has(data.visitorId);
-      memory.visitors.set(data.visitorId, Date.now());
-      if (first) memory.visitorTotal += 1;
-      return visitorStats();
-    }
-    const existing = await sql<{ visitor_id: string }>`
-      select visitor_id from visitor_pings where visitor_id = ${data.visitorId} limit 1
-    `;
-    await sql`
-      insert into visitor_pings (visitor_id, seen_at) values (${data.visitorId}, now())
-      on conflict (visitor_id) do update set seen_at = now()
-    `;
-    if (!existing[0]) {
-      const rows = await sql<{ v: string }>`select v from fund_meta where k = 'visitors'`;
-      const next = String(Number(rows[0]?.v ?? 0) + 1);
-      await sql`
-        insert into fund_meta (k, v) values ('visitors', ${next})
-        on conflict (k) do update set v = excluded.v
+    if (sql) {
+      const existing = await sql<{ visitor_id: string }>`
+        select visitor_id from visitor_pings where visitor_id = ${data.visitorId} limit 1
       `;
+      await sql`
+        insert into visitor_pings (visitor_id, seen_at) values (${data.visitorId}, now())
+        on conflict (visitor_id) do update set seen_at = now()
+      `;
+      if (!existing[0]) {
+        const rows = await sql<{ v: string }>`select v from fund_meta where k = 'visitors'`;
+        const next = String(Number(rows[0]?.v ?? 0) + 1);
+        await sql`
+          insert into fund_meta (k, v) values ('visitors', ${next})
+          on conflict (k) do update set v = excluded.v
+        `;
+      }
     }
     return visitorStats();
   });
 
+export async function resolveOutbound(id: number): Promise<string | null> {
+  await ensureSeed();
+  const tagged = (url: string) => withUtm(url, hostFromUrl(url));
+
+  const remote = await incrementSupabaseClick(id);
+  if (remote) return tagged(remote);
+
+  const sql = await trySql();
+  if (sql) {
+    const rows = await sql<{ product_url: string | null }>`
+      update contributions set click_count = coalesce(click_count, 0) + 1
+      where id = ${id}
+      returning product_url
+    `;
+    if (rows[0]?.product_url) return tagged(rows[0].product_url);
+  }
+
+  const hit = memory.contributions.find((c) => c.id === id);
+  if (!hit?.productUrl) {
+    const all = await loadContributions();
+    const row = all.find((c) => c.id === id);
+    if (!row?.productUrl) return null;
+    return tagged(row.productUrl);
+  }
+  hit.clickCount += 1;
+  return tagged(hit.productUrl);
+}
+
+async function incrementSupabaseClick(id: number): Promise<string | null> {
+  if (supabaseDown) return null;
+  const { data, error } = await supabase()
+    .from("contributions")
+    .select("id, product_url, click_count")
+    .eq("id", id)
+    .maybeSingle();
+  if (error || !data?.product_url) return null;
+  await supabase()
+    .from("contributions")
+    .update({ click_count: Number(data.click_count ?? 0) + 1 })
+    .eq("id", id);
+  return data.product_url as string;
+}
+
 export const registerClick = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({ id: z.number().int() }).parse(data))
   .handler(async ({ data }): Promise<{ url: string }> => {
-    await ensureSeed();
-    const sql = await trySql();
-    if (!sql) {
-      const hit = memory.contributions.find((c) => c.id === data.id);
-      if (!hit?.productUrl) throw new Error("No link on that rank");
-      hit.clickCount += 1;
-      return { url: hit.productUrl };
-    }
-    const rows = await sql<{ product_url: string | null }>`
-      update contributions set click_count = coalesce(click_count, 0) + 1
-      where id = ${data.id}
-      returning product_url
-    `;
-    const url = rows[0]?.product_url;
+    const url = await resolveOutbound(data.id);
     if (!url) throw new Error("No link on that rank");
     return { url };
   });

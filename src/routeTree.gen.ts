@@ -15,6 +15,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RulesRouteImport } from './routes/rules'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ThanksRouteImport } from './routes/thanks'
+import { Route as GoIdRouteImport } from './routes/go.$id'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const ThanksRoute = ThanksRouteImport.update({
   path: '/thanks',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GoIdRoute = GoIdRouteImport.update({
+  id: '/go/$id',
+  path: '/go/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe/webhook',
   path: '/api/stripe/webhook',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/rules': typeof RulesRoute
   '/terms': typeof TermsRoute
   '/thanks': typeof ThanksRoute
+  '/go/$id': typeof GoIdRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/rules': typeof RulesRoute
   '/terms': typeof TermsRoute
   '/thanks': typeof ThanksRoute
+  '/go/$id': typeof GoIdRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/rules': typeof RulesRoute
   '/terms': typeof TermsRoute
   '/thanks': typeof ThanksRoute
+  '/go/$id': typeof GoIdRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/rules'
     | '/terms'
     | '/thanks'
+    | '/go/$id'
     | '/api/stripe/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/rules'
     | '/terms'
     | '/thanks'
+    | '/go/$id'
     | '/api/stripe/webhook'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/rules'
     | '/terms'
     | '/thanks'
+    | '/go/$id'
     | '/api/stripe/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   RulesRoute: typeof RulesRoute
   TermsRoute: typeof TermsRoute
   ThanksRoute: typeof ThanksRoute
+  GoIdRoute: typeof GoIdRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ThanksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/go/$id': {
+      id: '/go/$id'
+      path: '/go/$id'
+      fullPath: '/go/$id'
+      preLoaderRoute: typeof GoIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stripe/webhook': {
       id: '/api/stripe/webhook'
       path: '/api/stripe/webhook'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   RulesRoute: RulesRoute,
   TermsRoute: TermsRoute,
   ThanksRoute: ThanksRoute,
+  GoIdRoute: GoIdRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport

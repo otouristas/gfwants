@@ -63,6 +63,30 @@ export function trackBeginCheckout(tierId: TierId, amountCents: number) {
   });
 }
 
+export function trackOutboundClick(input: {
+  url: string;
+  host?: string;
+  id?: number;
+  rank?: number;
+}) {
+  gtag("event", "click", {
+    event_category: "outbound",
+    outbound: true,
+    link_url: input.url,
+    link_domain: input.host,
+    link_id: input.id != null ? String(input.id) : undefined,
+    transport_type: "beacon",
+  });
+  gtag("event", "outbound_click", {
+    event_category: "engagement",
+    link_url: input.url,
+    link_domain: input.host,
+    sponsor_id: input.id,
+    rank: input.rank,
+    transport_type: "beacon",
+  });
+}
+
 export function trackPurchase(input: {
   transactionId: string;
   amountCents: number;
